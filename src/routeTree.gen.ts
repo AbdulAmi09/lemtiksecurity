@@ -11,11 +11,20 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as OfficerRouteImport } from './routes/officer'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OfficerIndexRouteImport } from './routes/officer.index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as OfficerSosRouteImport } from './routes/officer.sos'
+import { Route as OfficerScheduleRouteImport } from './routes/officer.schedule'
+import { Route as OfficerPatrolRouteImport } from './routes/officer.patrol'
+import { Route as OfficerNotificationsRouteImport } from './routes/officer.notifications'
+import { Route as OfficerNavigationRouteImport } from './routes/officer.navigation'
+import { Route as OfficerHomeRouteImport } from './routes/officer.home'
+import { Route as OfficerDispatchRouteImport } from './routes/officer.dispatch'
 import { Route as AppUsersRouteImport } from './routes/app.users'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppPatrolsRouteImport } from './routes/app.patrols'
@@ -25,9 +34,16 @@ import { Route as AppLocationsRouteImport } from './routes/app.locations'
 import { Route as AppIncidentsRouteImport } from './routes/app.incidents'
 import { Route as AppAuditRouteImport } from './routes/app.audit'
 import { Route as AppAlertsRouteImport } from './routes/app.alerts'
+import { Route as OfficerIncidentNewRouteImport } from './routes/officer.incident.new'
+import { Route as OfficerIncidentIdRouteImport } from './routes/officer.incident.$id'
 import { Route as AppUsersIdRouteImport } from './routes/app.users.$id'
 import { Route as AppPatrolsIdRouteImport } from './routes/app.patrols.$id'
 import { Route as AppIncidentsIdRouteImport } from './routes/app.incidents.$id'
+import { Route as AppAdminSystemRouteImport } from './routes/app.admin.system'
+import { Route as AppAdminOrganisationsRouteImport } from './routes/app.admin.organisations'
+import { Route as AppAdminBillingRouteImport } from './routes/app.admin.billing'
+import { Route as AppAdminAuditRouteImport } from './routes/app.admin.audit'
+import { Route as AppAdminOrganisationsIdRouteImport } from './routes/app.admin.organisations.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -37,6 +53,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfficerRoute = OfficerRouteImport.update({
+  id: '/officer',
+  path: '/officer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -59,10 +80,50 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfficerIndexRoute = OfficerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => OfficerRoute,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
+} as any)
+const OfficerSosRoute = OfficerSosRouteImport.update({
+  id: '/sos',
+  path: '/sos',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerScheduleRoute = OfficerScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerPatrolRoute = OfficerPatrolRouteImport.update({
+  id: '/patrol',
+  path: '/patrol',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerNotificationsRoute = OfficerNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerNavigationRoute = OfficerNavigationRouteImport.update({
+  id: '/navigation',
+  path: '/navigation',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerHomeRoute = OfficerHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerDispatchRoute = OfficerDispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
+  getParentRoute: () => OfficerRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
@@ -109,6 +170,16 @@ const AppAlertsRoute = AppAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => AppRoute,
 } as any)
+const OfficerIncidentNewRoute = OfficerIncidentNewRouteImport.update({
+  id: '/incident/new',
+  path: '/incident/new',
+  getParentRoute: () => OfficerRoute,
+} as any)
+const OfficerIncidentIdRoute = OfficerIncidentIdRouteImport.update({
+  id: '/incident/$id',
+  path: '/incident/$id',
+  getParentRoute: () => OfficerRoute,
+} as any)
 const AppUsersIdRoute = AppUsersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -124,12 +195,38 @@ const AppIncidentsIdRoute = AppIncidentsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppIncidentsRoute,
 } as any)
+const AppAdminSystemRoute = AppAdminSystemRouteImport.update({
+  id: '/admin/system',
+  path: '/admin/system',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminOrganisationsRoute = AppAdminOrganisationsRouteImport.update({
+  id: '/admin/organisations',
+  path: '/admin/organisations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminBillingRoute = AppAdminBillingRouteImport.update({
+  id: '/admin/billing',
+  path: '/admin/billing',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminAuditRoute = AppAdminAuditRouteImport.update({
+  id: '/admin/audit',
+  path: '/admin/audit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminOrganisationsIdRoute = AppAdminOrganisationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppAdminOrganisationsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/officer': typeof OfficerRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/app/alerts': typeof AppAlertsRoute
@@ -141,10 +238,25 @@ export interface FileRoutesByFullPath {
   '/app/patrols': typeof AppPatrolsRouteWithChildren
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
+  '/officer/dispatch': typeof OfficerDispatchRoute
+  '/officer/home': typeof OfficerHomeRoute
+  '/officer/navigation': typeof OfficerNavigationRoute
+  '/officer/notifications': typeof OfficerNotificationsRoute
+  '/officer/patrol': typeof OfficerPatrolRoute
+  '/officer/schedule': typeof OfficerScheduleRoute
+  '/officer/sos': typeof OfficerSosRoute
   '/app/': typeof AppIndexRoute
+  '/officer/': typeof OfficerIndexRoute
+  '/app/admin/audit': typeof AppAdminAuditRoute
+  '/app/admin/billing': typeof AppAdminBillingRoute
+  '/app/admin/organisations': typeof AppAdminOrganisationsRouteWithChildren
+  '/app/admin/system': typeof AppAdminSystemRoute
   '/app/incidents/$id': typeof AppIncidentsIdRoute
   '/app/patrols/$id': typeof AppPatrolsIdRoute
   '/app/users/$id': typeof AppUsersIdRoute
+  '/officer/incident/$id': typeof OfficerIncidentIdRoute
+  '/officer/incident/new': typeof OfficerIncidentNewRoute
+  '/app/admin/organisations/$id': typeof AppAdminOrganisationsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -161,10 +273,25 @@ export interface FileRoutesByTo {
   '/app/patrols': typeof AppPatrolsRouteWithChildren
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
+  '/officer/dispatch': typeof OfficerDispatchRoute
+  '/officer/home': typeof OfficerHomeRoute
+  '/officer/navigation': typeof OfficerNavigationRoute
+  '/officer/notifications': typeof OfficerNotificationsRoute
+  '/officer/patrol': typeof OfficerPatrolRoute
+  '/officer/schedule': typeof OfficerScheduleRoute
+  '/officer/sos': typeof OfficerSosRoute
   '/app': typeof AppIndexRoute
+  '/officer': typeof OfficerIndexRoute
+  '/app/admin/audit': typeof AppAdminAuditRoute
+  '/app/admin/billing': typeof AppAdminBillingRoute
+  '/app/admin/organisations': typeof AppAdminOrganisationsRouteWithChildren
+  '/app/admin/system': typeof AppAdminSystemRoute
   '/app/incidents/$id': typeof AppIncidentsIdRoute
   '/app/patrols/$id': typeof AppPatrolsIdRoute
   '/app/users/$id': typeof AppUsersIdRoute
+  '/officer/incident/$id': typeof OfficerIncidentIdRoute
+  '/officer/incident/new': typeof OfficerIncidentNewRoute
+  '/app/admin/organisations/$id': typeof AppAdminOrganisationsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -172,6 +299,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/officer': typeof OfficerRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/app/alerts': typeof AppAlertsRoute
@@ -183,10 +311,25 @@ export interface FileRoutesById {
   '/app/patrols': typeof AppPatrolsRouteWithChildren
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
+  '/officer/dispatch': typeof OfficerDispatchRoute
+  '/officer/home': typeof OfficerHomeRoute
+  '/officer/navigation': typeof OfficerNavigationRoute
+  '/officer/notifications': typeof OfficerNotificationsRoute
+  '/officer/patrol': typeof OfficerPatrolRoute
+  '/officer/schedule': typeof OfficerScheduleRoute
+  '/officer/sos': typeof OfficerSosRoute
   '/app/': typeof AppIndexRoute
+  '/officer/': typeof OfficerIndexRoute
+  '/app/admin/audit': typeof AppAdminAuditRoute
+  '/app/admin/billing': typeof AppAdminBillingRoute
+  '/app/admin/organisations': typeof AppAdminOrganisationsRouteWithChildren
+  '/app/admin/system': typeof AppAdminSystemRoute
   '/app/incidents/$id': typeof AppIncidentsIdRoute
   '/app/patrols/$id': typeof AppPatrolsIdRoute
   '/app/users/$id': typeof AppUsersIdRoute
+  '/officer/incident/$id': typeof OfficerIncidentIdRoute
+  '/officer/incident/new': typeof OfficerIncidentNewRoute
+  '/app/admin/organisations/$id': typeof AppAdminOrganisationsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -195,6 +338,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/forgot-password'
     | '/login'
+    | '/officer'
     | '/onboarding'
     | '/reset-password'
     | '/app/alerts'
@@ -206,10 +350,25 @@ export interface FileRouteTypes {
     | '/app/patrols'
     | '/app/reports'
     | '/app/users'
+    | '/officer/dispatch'
+    | '/officer/home'
+    | '/officer/navigation'
+    | '/officer/notifications'
+    | '/officer/patrol'
+    | '/officer/schedule'
+    | '/officer/sos'
     | '/app/'
+    | '/officer/'
+    | '/app/admin/audit'
+    | '/app/admin/billing'
+    | '/app/admin/organisations'
+    | '/app/admin/system'
     | '/app/incidents/$id'
     | '/app/patrols/$id'
     | '/app/users/$id'
+    | '/officer/incident/$id'
+    | '/officer/incident/new'
+    | '/app/admin/organisations/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -226,16 +385,32 @@ export interface FileRouteTypes {
     | '/app/patrols'
     | '/app/reports'
     | '/app/users'
+    | '/officer/dispatch'
+    | '/officer/home'
+    | '/officer/navigation'
+    | '/officer/notifications'
+    | '/officer/patrol'
+    | '/officer/schedule'
+    | '/officer/sos'
     | '/app'
+    | '/officer'
+    | '/app/admin/audit'
+    | '/app/admin/billing'
+    | '/app/admin/organisations'
+    | '/app/admin/system'
     | '/app/incidents/$id'
     | '/app/patrols/$id'
     | '/app/users/$id'
+    | '/officer/incident/$id'
+    | '/officer/incident/new'
+    | '/app/admin/organisations/$id'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/forgot-password'
     | '/login'
+    | '/officer'
     | '/onboarding'
     | '/reset-password'
     | '/app/alerts'
@@ -247,10 +422,25 @@ export interface FileRouteTypes {
     | '/app/patrols'
     | '/app/reports'
     | '/app/users'
+    | '/officer/dispatch'
+    | '/officer/home'
+    | '/officer/navigation'
+    | '/officer/notifications'
+    | '/officer/patrol'
+    | '/officer/schedule'
+    | '/officer/sos'
     | '/app/'
+    | '/officer/'
+    | '/app/admin/audit'
+    | '/app/admin/billing'
+    | '/app/admin/organisations'
+    | '/app/admin/system'
     | '/app/incidents/$id'
     | '/app/patrols/$id'
     | '/app/users/$id'
+    | '/officer/incident/$id'
+    | '/officer/incident/new'
+    | '/app/admin/organisations/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -258,6 +448,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  OfficerRoute: typeof OfficerRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
 }
@@ -276,6 +467,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/officer': {
+      id: '/officer'
+      path: '/officer'
+      fullPath: '/officer'
+      preLoaderRoute: typeof OfficerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -306,12 +504,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/officer/': {
+      id: '/officer/'
+      path: '/'
+      fullPath: '/officer/'
+      preLoaderRoute: typeof OfficerIndexRouteImport
+      parentRoute: typeof OfficerRoute
+    }
     '/app/': {
       id: '/app/'
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/officer/sos': {
+      id: '/officer/sos'
+      path: '/sos'
+      fullPath: '/officer/sos'
+      preLoaderRoute: typeof OfficerSosRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/schedule': {
+      id: '/officer/schedule'
+      path: '/schedule'
+      fullPath: '/officer/schedule'
+      preLoaderRoute: typeof OfficerScheduleRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/patrol': {
+      id: '/officer/patrol'
+      path: '/patrol'
+      fullPath: '/officer/patrol'
+      preLoaderRoute: typeof OfficerPatrolRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/notifications': {
+      id: '/officer/notifications'
+      path: '/notifications'
+      fullPath: '/officer/notifications'
+      preLoaderRoute: typeof OfficerNotificationsRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/navigation': {
+      id: '/officer/navigation'
+      path: '/navigation'
+      fullPath: '/officer/navigation'
+      preLoaderRoute: typeof OfficerNavigationRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/home': {
+      id: '/officer/home'
+      path: '/home'
+      fullPath: '/officer/home'
+      preLoaderRoute: typeof OfficerHomeRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/dispatch': {
+      id: '/officer/dispatch'
+      path: '/dispatch'
+      fullPath: '/officer/dispatch'
+      preLoaderRoute: typeof OfficerDispatchRouteImport
+      parentRoute: typeof OfficerRoute
     }
     '/app/users': {
       id: '/app/users'
@@ -376,6 +630,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAlertsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/officer/incident/new': {
+      id: '/officer/incident/new'
+      path: '/incident/new'
+      fullPath: '/officer/incident/new'
+      preLoaderRoute: typeof OfficerIncidentNewRouteImport
+      parentRoute: typeof OfficerRoute
+    }
+    '/officer/incident/$id': {
+      id: '/officer/incident/$id'
+      path: '/incident/$id'
+      fullPath: '/officer/incident/$id'
+      preLoaderRoute: typeof OfficerIncidentIdRouteImport
+      parentRoute: typeof OfficerRoute
+    }
     '/app/users/$id': {
       id: '/app/users/$id'
       path: '/$id'
@@ -396,6 +664,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/incidents/$id'
       preLoaderRoute: typeof AppIncidentsIdRouteImport
       parentRoute: typeof AppIncidentsRoute
+    }
+    '/app/admin/system': {
+      id: '/app/admin/system'
+      path: '/admin/system'
+      fullPath: '/app/admin/system'
+      preLoaderRoute: typeof AppAdminSystemRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin/organisations': {
+      id: '/app/admin/organisations'
+      path: '/admin/organisations'
+      fullPath: '/app/admin/organisations'
+      preLoaderRoute: typeof AppAdminOrganisationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin/billing': {
+      id: '/app/admin/billing'
+      path: '/admin/billing'
+      fullPath: '/app/admin/billing'
+      preLoaderRoute: typeof AppAdminBillingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin/audit': {
+      id: '/app/admin/audit'
+      path: '/admin/audit'
+      fullPath: '/app/admin/audit'
+      preLoaderRoute: typeof AppAdminAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/admin/organisations/$id': {
+      id: '/app/admin/organisations/$id'
+      path: '/$id'
+      fullPath: '/app/admin/organisations/$id'
+      preLoaderRoute: typeof AppAdminOrganisationsIdRouteImport
+      parentRoute: typeof AppAdminOrganisationsRoute
     }
   }
 }
@@ -436,6 +739,19 @@ const AppUsersRouteWithChildren = AppUsersRoute._addFileChildren(
   AppUsersRouteChildren,
 )
 
+interface AppAdminOrganisationsRouteChildren {
+  AppAdminOrganisationsIdRoute: typeof AppAdminOrganisationsIdRoute
+}
+
+const AppAdminOrganisationsRouteChildren: AppAdminOrganisationsRouteChildren = {
+  AppAdminOrganisationsIdRoute: AppAdminOrganisationsIdRoute,
+}
+
+const AppAdminOrganisationsRouteWithChildren =
+  AppAdminOrganisationsRoute._addFileChildren(
+    AppAdminOrganisationsRouteChildren,
+  )
+
 interface AppRouteChildren {
   AppAlertsRoute: typeof AppAlertsRoute
   AppAuditRoute: typeof AppAuditRoute
@@ -447,6 +763,10 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppUsersRoute: typeof AppUsersRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
+  AppAdminAuditRoute: typeof AppAdminAuditRoute
+  AppAdminBillingRoute: typeof AppAdminBillingRoute
+  AppAdminOrganisationsRoute: typeof AppAdminOrganisationsRouteWithChildren
+  AppAdminSystemRoute: typeof AppAdminSystemRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -460,15 +780,49 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppUsersRoute: AppUsersRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
+  AppAdminAuditRoute: AppAdminAuditRoute,
+  AppAdminBillingRoute: AppAdminBillingRoute,
+  AppAdminOrganisationsRoute: AppAdminOrganisationsRouteWithChildren,
+  AppAdminSystemRoute: AppAdminSystemRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface OfficerRouteChildren {
+  OfficerDispatchRoute: typeof OfficerDispatchRoute
+  OfficerHomeRoute: typeof OfficerHomeRoute
+  OfficerNavigationRoute: typeof OfficerNavigationRoute
+  OfficerNotificationsRoute: typeof OfficerNotificationsRoute
+  OfficerPatrolRoute: typeof OfficerPatrolRoute
+  OfficerScheduleRoute: typeof OfficerScheduleRoute
+  OfficerSosRoute: typeof OfficerSosRoute
+  OfficerIndexRoute: typeof OfficerIndexRoute
+  OfficerIncidentIdRoute: typeof OfficerIncidentIdRoute
+  OfficerIncidentNewRoute: typeof OfficerIncidentNewRoute
+}
+
+const OfficerRouteChildren: OfficerRouteChildren = {
+  OfficerDispatchRoute: OfficerDispatchRoute,
+  OfficerHomeRoute: OfficerHomeRoute,
+  OfficerNavigationRoute: OfficerNavigationRoute,
+  OfficerNotificationsRoute: OfficerNotificationsRoute,
+  OfficerPatrolRoute: OfficerPatrolRoute,
+  OfficerScheduleRoute: OfficerScheduleRoute,
+  OfficerSosRoute: OfficerSosRoute,
+  OfficerIndexRoute: OfficerIndexRoute,
+  OfficerIncidentIdRoute: OfficerIncidentIdRoute,
+  OfficerIncidentNewRoute: OfficerIncidentNewRoute,
+}
+
+const OfficerRouteWithChildren =
+  OfficerRoute._addFileChildren(OfficerRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  OfficerRoute: OfficerRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
 }

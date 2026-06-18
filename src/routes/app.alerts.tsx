@@ -11,6 +11,8 @@ import { listMembers } from "@/lib/orgs.functions";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
 import { type Severity } from "@/lib/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import {
   MessageCircle, Mail, Bell, Smartphone, Loader2, CheckCircle2, XCircle, Send, Plus, Trash2,
 } from "lucide-react";
@@ -18,6 +20,12 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/alerts")({
   head: () => ({ meta: [{ title: "Alerts · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    requireSectionAccess(await resolveAppAccess(supabase), [
+      "security_manager",
+      "operator",
+    ]);
+  },
   component: Alerts,
 });
 

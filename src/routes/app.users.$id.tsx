@@ -2,11 +2,19 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { getMemberDetail, getMemberActivity } from "@/lib/users.functions";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import { ArrowLeft, ShieldCheck, MapPin, Loader2, Activity, ClipboardList, Radar, FileText, Sparkles, Clock3, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/app/users/$id")({
   head: () => ({ meta: [{ title: "Profile · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    requireSectionAccess(await resolveAppAccess(supabase), [
+      "security_manager",
+      "client_admin",
+    ]);
+  },
   component: MemberPage,
 });
 

@@ -67,7 +67,7 @@ export const getIncidentDetail = createServerFn({ method: "GET" })
     if (linkIds.length > 0) {
       const { data: rows } = await supabase
         .from("incidents")
-        .select("id, code, type, severity, status, location, zone, reported_at")
+        .select("id, code, type, severity, status, location, zone, reported_at, coord_x, coord_y")
         .in("id", linkIds);
       linkedIncidents = rows ?? [];
     }
@@ -77,7 +77,7 @@ export const getIncidentDetail = createServerFn({ method: "GET" })
     const until = new Date(new Date(incident.reported_at).getTime() + 24 * 3600_000).toISOString();
     const { data: suggestions } = await supabase
       .from("incidents")
-      .select("id, code, type, severity, location, zone, reported_at")
+      .select("id, code, type, severity, location, zone, reported_at, coord_x, coord_y")
       .eq("organisation_id", incident.organisation_id)
       .eq("zone", incident.zone)
       .gte("reported_at", since)
@@ -106,6 +106,41 @@ export const getIncidentDetail = createServerFn({ method: "GET" })
       linkedIncidents,
       suggested,
     };
+  });
+
+// ---------- GENERIC INCIDENT ACTION LOG -----------------------------------
+
+export const recordIncidentAction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      incident_id: z.string().uuid(),
+      kind: z.string().min(1).max(60),
+      message: z.string().min(1).max(500),
+      meta: z.record(z.string(), z.unknown()).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: inc } = await supabase
+      .from("incidents")
+      .select("organisation_id")
+      .eq("id", data.incident_id)
+      .maybeSingle();
+    if (!inc) throw new Error("Incident not found.");
+
+    const name = await actorName(supabase, userId);
+    const { error } = await supabase.from("incident_activity").insert({
+      incident_id: data.incident_id,
+      organisation_id: inc.organisation_id,
+      actor_id: userId,
+      actor_name: name,
+      kind: data.kind,
+      message: data.message,
+      meta: data.meta ?? {},
+    });
+    if (error) throwSafeError("incidents.activity", error, "Unable to record incident action.");
+    return { ok: true };
   });
 
 // ---------- STATUS CHANGE (with required note) -----------------------------
@@ -247,11 +282,31 @@ export const addIncidentEvidence = createServerFn({ method: "POST" })
       .from("incidents").select("organisation_id, evidence").eq("id", data.incident_id).maybeSingle();
     if (!inc) throw new Error("Incident not found.");
     const current = Array.isArray(inc.evidence) ? inc.evidence : [];
-    const merged = [...current, ...data.items];
+    const name = await actorName(supabase, userId);
+    const stamped = new Date().toISOString();
+    const merged = [
+      ...current,
+      ...data.items.map((item) => ({
+        ...item,
+        added_at: stamped,
+        added_by: userId,
+        added_by_name: name,
+        legal: false,
+        legal_flagged_at: null,
+        legal_flagged_by: null,
+        chain_of_custody: [
+          {
+            at: stamped,
+            actor_id: userId,
+            actor_name: name,
+            action: "added",
+          },
+        ],
+      })),
+    ];
     const { error } = await supabase
       .from("incidents").update({ evidence: merged }).eq("id", data.incident_id);
     if (error) throwSafeError("incidents.evidence", error, "Unable to attach evidence.");
-    const name = await actorName(supabase, userId);
     await logActivity(supabase, {
       incident_id: data.incident_id,
       organisation_id: inc.organisation_id,
@@ -260,6 +315,63 @@ export const addIncidentEvidence = createServerFn({ method: "POST" })
       kind: "evidence_added",
       message: `Added ${data.items.length} evidence item(s)`,
       meta: { items: data.items.map((i) => i.name) },
+    });
+    return { ok: true };
+  });
+
+export const updateIncidentEvidence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      incident_id: z.string().uuid(),
+      path: z.string().min(1).max(500),
+      legal: z.boolean(),
+      note: z.string().max(200).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: inc } = await supabase
+      .from("incidents").select("organisation_id, evidence").eq("id", data.incident_id).maybeSingle();
+    if (!inc) throw new Error("Incident not found.");
+    const current = Array.isArray(inc.evidence) ? inc.evidence : [];
+    const name = await actorName(supabase, userId);
+    const stamped = new Date().toISOString();
+    let found = false;
+    const updated = current.map((item: any) => {
+      if (item.path !== data.path) return item;
+      found = true;
+      const custody = Array.isArray(item.chain_of_custody) ? item.chain_of_custody : [];
+      return {
+        ...item,
+        legal: data.legal,
+        legal_flagged_at: data.legal ? stamped : item.legal_flagged_at ?? null,
+        legal_flagged_by: data.legal ? userId : item.legal_flagged_by ?? null,
+        legal_note: data.note ?? item.legal_note ?? null,
+        chain_of_custody: [
+          ...custody,
+          {
+            at: stamped,
+            actor_id: userId,
+            actor_name: name,
+            action: data.legal ? "legal-flagged" : "legal-unflagged",
+            note: data.note ?? null,
+          },
+        ],
+      };
+    });
+    if (!found) throw new Error("Evidence item not found.");
+    const { error } = await supabase
+      .from("incidents").update({ evidence: updated }).eq("id", data.incident_id);
+    if (error) throwSafeError("incidents.evidence.update", error, "Unable to update evidence item.");
+    await logActivity(supabase, {
+      incident_id: data.incident_id,
+      organisation_id: inc.organisation_id,
+      actor_id: userId,
+      actor_name: name,
+      kind: data.legal ? "evidence_legal_flagged" : "evidence_legal_cleared",
+      message: `${data.legal ? "Flagged" : "Cleared"} evidence ${data.path.split("/").pop() ?? data.path}`,
+      meta: { path: data.path, legal: data.legal, note: data.note ?? null },
     });
     return { ok: true };
   });

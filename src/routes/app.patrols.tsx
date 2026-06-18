@@ -4,10 +4,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listPatrols, createPatrol, checkInWaypoint, updatePatrolStatus } from "@/lib/patrols.functions";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import { Radar, QrCode, Plus, X, Loader2, CheckCircle2, Archive, Activity, ShieldAlert, Clock3 } from "lucide-react";
 
 export const Route = createFileRoute("/app/patrols")({
   head: () => ({ meta: [{ title: "Patrols · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    requireSectionAccess(await resolveAppAccess(supabase), [
+      "security_manager",
+      "operator",
+      "client_admin",
+    ]);
+  },
   component: Patrols,
 });
 

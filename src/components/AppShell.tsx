@@ -14,34 +14,40 @@ import {
   LogOut,
   History,
   Building2,
+  ReceiptText,
   MapPin,
   ChevronDown,
   Plus,
+  ServerCrash,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listMyOrgs, switchActiveOrg, getActiveOrg } from "@/lib/orgs.functions";
 import { NotificationBell } from "@/components/NotificationBell";
+import type { AppAccess, SpecRole } from "@/lib/rbac";
 
 const nav = [
-  { to: "/app", label: "Overview", icon: LayoutDashboard, exact: true },
-  { to: "/app/map", label: "Live Map", icon: Map },
-  { to: "/app/incidents", label: "Incidents", icon: AlertTriangle },
-  { to: "/app/patrols", label: "Patrols", icon: Radar },
-  { to: "/app/alerts", label: "Alerts", icon: Bell },
-  { to: "/app/reports", label: "Reports", icon: BarChart3 },
-  { to: "/app/locations", label: "Locations", icon: MapPin },
-  { to: "/app/users", label: "Team", icon: Users },
-  { to: "/app/org", label: "Organisation", icon: Building2 },
-  { to: "/app/audit", label: "Audit", icon: History },
+  { to: "/app", label: "Overview", icon: LayoutDashboard, exact: true, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/map", label: "Live Map", icon: Map, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/incidents", label: "Incidents", icon: AlertTriangle, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/patrols", label: "Patrols", icon: Radar, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/alerts", label: "Alerts", icon: Bell, allowed: ["security_manager", "operator"] as SpecRole[] },
+  { to: "/app/reports", label: "Reports", icon: BarChart3, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/locations", label: "Locations", icon: MapPin, allowed: ["security_manager", "client_admin"] as SpecRole[] },
+  { to: "/app/users", label: "Team", icon: Users, allowed: ["security_manager", "client_admin"] as SpecRole[] },
+  { to: "/app/org", label: "Organisation", icon: Building2, allowed: ["security_manager", "client_admin"] as SpecRole[] },
+  { to: "/app/audit", label: "Audit", icon: History, allowed: ["security_manager", "client_admin"] as SpecRole[] },
 ];
 
-export function AppShell() {
+export function AppShell({ access }: { access: AppAccess }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [me, setMe] = useState<{ name: string; role: string }>({ name: "Operator", role: "Officer" });
+  const [me, setMe] = useState<{ name: string; role: string }>({
+    name: "Operator",
+    role: access.roleLabel,
+  });
   const [clock, setClock] = useState<string>("");
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const orgMenuRef = useRef<HTMLDivElement>(null);
@@ -49,9 +55,10 @@ export function AppShell() {
   const listMine = useServerFn(listMyOrgs);
   const getOrg = useServerFn(getActiveOrg);
   const switchOrg = useServerFn(switchActiveOrg);
+  const orgQueriesEnabled = access.specRole !== "lemtik_admin";
 
-  const { data: orgs = [] } = useQuery({ queryKey: ["my-orgs"], queryFn: () => listMine() });
-  const { data: activeOrg } = useQuery({ queryKey: ["active-org"], queryFn: () => getOrg() });
+  const { data: orgs = [] } = useQuery({ queryKey: ["my-orgs"], queryFn: () => listMine(), enabled: orgQueriesEnabled });
+  const { data: activeOrg } = useQuery({ queryKey: ["active-org"], queryFn: () => getOrg(), enabled: orgQueriesEnabled });
 
   const switchMut = useMutation({
     mutationFn: (id: string) => switchOrg({ data: { organisation_id: id } }),
@@ -88,12 +95,8 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    const currentMembership = orgs.find((o) => o.id === activeOrg?.id);
-    if (currentMembership) {
-      const r = currentMembership.role;
-      setMe((m) => ({ ...m, role: r.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase()) }));
-    }
-  }, [orgs, activeOrg]);
+    setMe((m) => ({ ...m, role: access.roleLabel }));
+  }, [access.roleLabel]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -101,6 +104,134 @@ export function AppShell() {
   };
 
   const initials = me.name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const visibleNav = nav.filter((item) => item.allowed.includes(access.specRole));
+
+  if (access.specRole === "lemtik_admin") {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground">
+        <aside className="hidden md:flex w-64 flex-col border-r border-sidebar-border bg-sidebar">
+          <div className="flex items-center gap-2 px-5 py-5 border-b border-sidebar-border">
+            <div className="grid h-9 w-9 place-items-center rounded-md bg-primary/15 border border-primary/40">
+              <ShieldHalf className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold tracking-tight">LEMTIK</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Platform Admin</div>
+            </div>
+          </div>
+
+          <nav className="flex-1 px-2 py-3 space-y-0.5">
+            <Link
+              to="/app"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                pathname === "/app"
+                  ? "bg-sidebar-accent text-foreground border border-sidebar-border"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Platform dashboard
+              </Link>
+            <Link
+              to="/app/admin/billing"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                pathname.startsWith("/app/admin/billing")
+                  ? "bg-sidebar-accent text-foreground border border-sidebar-border"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+              }`}
+            >
+              <ReceiptText className="h-4 w-4" />
+              Billing
+            </Link>
+            <Link
+              to="/app/admin/organisations"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                pathname.startsWith("/app/admin/organisations")
+                  ? "bg-sidebar-accent text-foreground border border-sidebar-border"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              Organisations
+            </Link>
+            <Link
+              to="/app/admin/system"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                pathname.startsWith("/app/admin/system")
+                  ? "bg-sidebar-accent text-foreground border border-sidebar-border"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+              }`}
+            >
+              <ServerCrash className="h-4 w-4" />
+              System health
+            </Link>
+            <Link
+              to="/app/admin/audit"
+              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                pathname.startsWith("/app/admin/audit")
+                  ? "bg-sidebar-accent text-foreground border border-sidebar-border"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+              }`}
+            >
+              <History className="h-4 w-4" />
+              Platform audit
+            </Link>
+          </nav>
+
+          <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
+            <div className="rounded-md bg-surface-2 border border-border p-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="h-2 w-2 rounded-full bg-resolved pulse-dot" />
+                <span className="font-medium">Platform console</span>
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground font-mono">
+                Global admin · <span suppressHydrationWarning>{clock || "--:--"}</span>
+              </div>
+            </div>
+            <button
+              onClick={signOut}
+              className="flex w-full items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-surface-2"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign out
+            </button>
+          </div>
+        </aside>
+
+        <main className="flex-1 min-w-0 flex flex-col">
+          <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-border bg-background/80 backdrop-blur px-6 py-3">
+            <div className="flex items-center gap-3">
+              <div className="md:hidden">
+                <ShieldHalf className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Platform dashboard</div>
+                <div className="text-sm font-medium">{access.orgName}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 rounded-md border border-resolved/40 bg-resolved/10 px-2.5 py-1 text-[11px] text-resolved">
+                <Radio className="h-3 w-3 pulse-dot" />
+                <span className="font-mono uppercase tracking-wider">Platform health</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="grid h-7 w-7 place-items-center rounded-full bg-accent/20 border border-accent/40 text-[10px] font-bold text-accent">
+                  {me.name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "AD"}
+                </div>
+                <div className="hidden sm:block leading-tight">
+                  <div className="text-xs font-medium">{me.name}</div>
+                  <div className="text-[10px] text-muted-foreground">{me.role}</div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex-1 p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -123,7 +254,7 @@ export function AppShell() {
           >
             <div className="flex items-center gap-2 min-w-0">
               <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="truncate font-medium">{activeOrg?.name ?? "No organisation"}</span>
+              <span className="truncate font-medium">{activeOrg?.name ?? access.orgName ?? "No organisation"}</span>
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           </button>
@@ -153,7 +284,7 @@ export function AppShell() {
         </div>
 
         <nav className="flex-1 px-2 py-3 space-y-0.5">
-          {nav.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + "/");
             const Icon = item.icon;
             return (

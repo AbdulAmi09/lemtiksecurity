@@ -1,12 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { listLocations, upsertLocation, deleteLocation } from "@/lib/orgs.functions";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import { Loader2, Plus, X, MapPin, Save, Radar, Layers, ShieldAlert } from "lucide-react";
 
 export const Route = createFileRoute("/app/locations")({
   head: () => ({ meta: [{ title: "Locations · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    requireSectionAccess(await resolveAppAccess(supabase), [
+      "security_manager",
+      "client_admin",
+    ]);
+  },
   component: Locations,
 });
 
@@ -32,6 +40,24 @@ function Locations() {
 
   const [draft, setDraft] = useState({ name: "", address: "", coord_x: "", coord_y: "", geofence: "" });
   const [editing, setEditing] = useState<Loc | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("lemtik_zone_draft");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { name?: string; coord_x?: number; coord_y?: number };
+      setDraft((prev) => ({
+        ...prev,
+        name: parsed.name ?? "New live zone",
+        address: `Map draft @ ${Number(parsed.coord_y ?? 0).toFixed(5)}, ${Number(parsed.coord_x ?? 0).toFixed(5)}`,
+        coord_x: parsed.coord_x != null ? String(parsed.coord_x) : prev.coord_x,
+        coord_y: parsed.coord_y != null ? String(parsed.coord_y) : prev.coord_y,
+      }));
+      sessionStorage.removeItem("lemtik_zone_draft");
+    } catch {
+      sessionStorage.removeItem("lemtik_zone_draft");
+    }
+  }, []);
 
   const saveMut = useMutation({
     mutationFn: () => {

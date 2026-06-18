@@ -44,6 +44,7 @@ export function IncidentReportForm({
   organisationId,
   savedLocations,
   defaultZone,
+  initialDraft,
   onSubmit,
   loading,
   error,
@@ -52,6 +53,7 @@ export function IncidentReportForm({
   organisationId: string;
   savedLocations: SavedLocation[];
   defaultZone: string;
+  initialDraft?: Partial<Pick<IncidentSubmitPayload, "type" | "severity" | "title" | "location" | "zone" | "description" | "coord_x" | "coord_y" | "location_id">>;
   onSubmit: (data: IncidentSubmitPayload) => void;
   loading: boolean;
   error: string | null;
@@ -59,16 +61,16 @@ export function IncidentReportForm({
 }) {
   const [mode, setMode] = useState<"quick" | "full">("quick");
   const [form, setForm] = useState({
-    type: "intrusion" as IncidentType,
-    severity: 3,
-    title: "",
-    location: "",
-    zone: defaultZone,
-    description: "",
+    type: initialDraft?.type ?? ("intrusion" as IncidentType),
+    severity: initialDraft?.severity ?? 3,
+    title: initialDraft?.title ?? "",
+    location: initialDraft?.location ?? "",
+    zone: initialDraft?.zone ?? defaultZone,
+    description: initialDraft?.description ?? "",
     occurred_at: new Date().toISOString().slice(0, 16),
-    coord_x: undefined as number | undefined,
-    coord_y: undefined as number | undefined,
-    location_id: "" as string,
+    coord_x: initialDraft?.coord_x as number | undefined,
+    coord_y: initialDraft?.coord_y as number | undefined,
+    location_id: initialDraft?.location_id ?? "" as string,
     suspect_count: "" as string,
     suspect_description: "",
     victim_name: "",

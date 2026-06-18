@@ -11,7 +11,8 @@ import { SeverityBadge } from "@/components/SeverityBadge";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
 import { IncidentReportForm, type IncidentSubmitPayload } from "@/components/IncidentReportForm";
 import * as offline from "@/lib/offlineQueue";
-import { Plus, Filter, Loader2, Download, WifiOff, CloudUpload, ArrowUpDown, Search, X } from "lucide-react";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
+import { Plus, Filter, Loader2, Download, WifiOff, CloudUpload, ArrowUpDown, Search, X, Eye, UserRoundPlus, ListChecks, BrainCircuit, ChevronLeft, ChevronRight } from "lucide-react";
 
 type IncidentRow = {
   id: string;
@@ -30,13 +31,23 @@ type IncidentRow = {
 
 export const Route = createFileRoute("/app/incidents")({
   head: () => ({ meta: [{ title: "Incidents · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    const appAccess = await resolveAppAccess(supabase);
+    requireSectionAccess(appAccess, [
+      "security_manager",
+      "operator",
+      "client_admin",
+    ]);
+    return { appAccess };
+  },
   component: Incidents,
 });
 
-type SortKey = "severity" | "reported_at" | "status" | "type" | "location" | "officer";
+type SortKey = "id" | "severity" | "reported_at" | "time_open" | "status" | "type" | "location" | "officer";
 
 function Incidents() {
   const navigate = useNavigate();
+  const { appAccess } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const list = useServerFn(listIncidents);
   const create = useServerFn(createIncident);
@@ -64,15 +75,19 @@ function Incidents() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<IncidentStatus | "">("");
   const [filterType, setFilterType] = useState<IncidentType | "">("");
+  const [filterLocation, setFilterLocation] = useState("");
   const [filterZone, setFilterZone] = useState("");
+  const [filterOfficer, setFilterOfficer] = useState("");
   const [filterSevMin, setFilterSevMin] = useState(1);
   const [filterSevMax, setFilterSevMax] = useState(5);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("reported_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showNew, setShowNew] = useState(false);
+  const [draft, setDraft] = useState<Partial<IncidentSubmitPayload> | null>(null);
   const [bulkOpen, setBulkOpen] = useState<"status" | "assign" | null>(null);
 
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
@@ -93,13 +108,28 @@ function Incidents() {
     return () => { window.removeEventListener("offline", goOffline); window.removeEventListener("online", goOnline); unsub(); };
   }, [create, queryClient]);
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("lemtik_incident_draft");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<IncidentSubmitPayload>;
+      setDraft(parsed);
+      setShowNew(true);
+      sessionStorage.removeItem("lemtik_incident_draft");
+    } catch {
+      sessionStorage.removeItem("lemtik_incident_draft");
+    }
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return incidents
       .filter((i) => !mineOnly || i.reported_by === me || (i.officer && members.find((m: any) => m.user_id === me)?.profile?.display_name === i.officer))
       .filter((i) => !filterStatus || i.status === filterStatus)
       .filter((i) => !filterType || i.type === filterType)
+      .filter((i) => !filterLocation || i.location === filterLocation)
       .filter((i) => !filterZone || i.zone === filterZone)
+      .filter((i) => !filterOfficer || i.officer === filterOfficer)
       .filter((i) => i.severity >= filterSevMin && i.severity <= filterSevMax)
       .filter((i) => !filterFrom || new Date(i.reported_at) >= new Date(filterFrom))
       .filter((i) => !filterTo || new Date(i.reported_at) <= new Date(filterTo))
@@ -110,20 +140,30 @@ function Incidents() {
       })
       .sort((a, b) => {
         const dir = sortDir === "asc" ? 1 : -1;
-        const av: any = (a as any)[sortKey] ?? "";
-        const bv: any = (b as any)[sortKey] ?? "";
+        const av: any = sortKey === "time_open" ? Date.now() - new Date(a.reported_at).getTime() : (a as any)[sortKey] ?? "";
+        const bv: any = sortKey === "time_open" ? Date.now() - new Date(b.reported_at).getTime() : (b as any)[sortKey] ?? "";
         if (sortKey === "reported_at") return (new Date(av).getTime() - new Date(bv).getTime()) * dir;
+        if (sortKey === "time_open") return (av - bv) * dir;
         if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
         return String(av).localeCompare(String(bv)) * dir;
       });
-  }, [incidents, search, mineOnly, me, members, filterStatus, filterType, filterZone, filterSevMin, filterSevMax, filterFrom, filterTo, sortKey, sortDir]);
+  }, [incidents, search, mineOnly, me, members, filterStatus, filterType, filterLocation, filterZone, filterOfficer, filterSevMin, filterSevMax, filterFrom, filterTo, sortKey, sortDir]);
 
   const allZones = useMemo(() => Array.from(new Set(incidents.map((i) => i.zone))).sort(), [incidents]);
-  const allSelectedOnPage = filtered.length > 0 && filtered.every((i) => selected.has(i.id));
+  const allLocations = useMemo(() => Array.from(new Set(incidents.map((i) => i.location))).sort(), [incidents]);
+  const allOfficers = useMemo(() => Array.from(new Set(incidents.map((i) => i.officer).filter(Boolean) as string[])).sort(), [incidents]);
+  const totalCount = incidents.length;
+  const openCount = incidents.filter((i) => i.status !== "resolved" && i.status !== "closed").length;
+  const criticalCount = incidents.filter((i) => Number(i.severity) >= 4 && i.status !== "resolved" && i.status !== "closed").length;
+  const canManage = appAccess.specRole !== "client_admin";
+  const pageSize = 50;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const allSelectedOnPage = paginated.length > 0 && paginated.every((i) => selected.has(i.id));
   const toggleAll = () => {
     const next = new Set(selected);
-    if (allSelectedOnPage) filtered.forEach((i) => next.delete(i.id));
-    else filtered.forEach((i) => next.add(i.id));
+    if (allSelectedOnPage) paginated.forEach((i) => next.delete(i.id));
+    else paginated.forEach((i) => next.add(i.id));
     setSelected(next);
   };
   const toggleOne = (id: string) => {
@@ -136,6 +176,10 @@ function Incidents() {
     if (k === sortKey) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setSortDir(k === "severity" || k === "reported_at" ? "desc" : "asc"); }
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, mineOnly, filterStatus, filterType, filterLocation, filterZone, filterOfficer, filterSevMin, filterSevMax, filterFrom, filterTo, sortKey, sortDir]);
 
   const exportCsv = () => {
     const rows = (selected.size > 0 ? filtered.filter((i) => selected.has(i.id)) : filtered);
@@ -200,14 +244,23 @@ function Incidents() {
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Incidents</div>
           <h1 className="mt-1 text-2xl font-semibold">All incidents</h1>
           <p className="text-sm text-muted-foreground">Sortable, filterable, fully searchable.</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <Pill label="Total" value={String(totalCount)} />
+            <Pill label="Open" value={String(openCount)} tone="warning" />
+            <Pill label="Critical" value={String(criticalCount)} tone="critical" />
+          </div>
         </div>
         <div className="flex gap-2">
           <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-xs hover:bg-surface-2">
             <Download className="h-3.5 w-3.5" /> Export {selected.size > 0 ? `(${selected.size})` : "CSV"}
           </button>
-          <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-            <Plus className="h-3.5 w-3.5" /> New incident
-          </button>
+          {canManage ? (
+            <button onClick={() => setShowNew(true)} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-3.5 w-3.5" /> Log Incident
+            </button>
+          ) : (
+            <div className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">Read-only view</div>
+          )}
         </div>
       </div>
 
@@ -231,7 +284,7 @@ function Incidents() {
       </div>
 
       {showFilters && (
-        <div className="rounded-md border border-border bg-card p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+        <div className="rounded-md border border-border bg-card p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2 text-xs">
           <Field label="Status">
             <select className="filter-input" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
               <option value="">All</option>
@@ -244,10 +297,22 @@ function Incidents() {
               {(Object.keys(typeMeta) as IncidentType[]).map((t) => <option key={t} value={t}>{typeMeta[t]}</option>)}
             </select>
           </Field>
+          <Field label="Location">
+            <select className="filter-input" value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
+              <option value="">All</option>
+              {allLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+            </select>
+          </Field>
           <Field label="Zone">
             <select className="filter-input" value={filterZone} onChange={(e) => setFilterZone(e.target.value)}>
               <option value="">All</option>
               {allZones.map((z) => <option key={z} value={z}>{z}</option>)}
+            </select>
+          </Field>
+          <Field label="Assigned to">
+            <select className="filter-input" value={filterOfficer} onChange={(e) => setFilterOfficer(e.target.value)}>
+              <option value="">All</option>
+              {allOfficers.map((officer) => <option key={officer} value={officer}>{officer}</option>)}
             </select>
           </Field>
           <Field label={`Severity ${filterSevMin}–${filterSevMax}`}>
@@ -271,8 +336,12 @@ function Incidents() {
         <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs">
           <div>{selected.size} selected</div>
           <div className="flex gap-2">
-            <button onClick={() => setBulkOpen("status")} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Update status</button>
-            <button onClick={() => setBulkOpen("assign")} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Assign</button>
+            {canManage && (
+              <>
+                <button onClick={() => setBulkOpen("status")} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Update status</button>
+                <button onClick={() => setBulkOpen("assign")} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Assign</button>
+              </>
+            )}
             <button onClick={exportCsv} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Export</button>
             <button onClick={() => setSelected(new Set())} className="rounded border border-current px-2 py-0.5 uppercase tracking-wider text-[10px]">Clear</button>
           </div>
@@ -292,17 +361,19 @@ function Incidents() {
             <thead className="bg-surface text-[10px] uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3 py-3 w-8"><input type="checkbox" checked={allSelectedOnPage} onChange={toggleAll} /></th>
+                <SortHeader k="id" sortKey={sortKey} dir={sortDir} onSort={sortBy}>ID</SortHeader>
                 <SortHeader k="severity" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Sev</SortHeader>
-                <th className="text-left px-3 py-3 font-medium">ID</th>
                 <SortHeader k="type" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Type</SortHeader>
                 <SortHeader k="location" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Location</SortHeader>
                 <SortHeader k="officer" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Officer</SortHeader>
                 <SortHeader k="reported_at" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Reported</SortHeader>
+                <SortHeader k="time_open" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Time open</SortHeader>
                 <SortHeader k="status" sortKey={sortKey} dir={sortDir} onSort={sortBy}>Status</SortHeader>
+                <th className="text-left px-3 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((i) => {
+              {paginated.map((i) => {
                 const meta = severityMeta[i.severity as Severity];
                 return (
                   <tr
@@ -314,8 +385,8 @@ function Incidents() {
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggleOne(i.id)} />
                     </td>
-                    <td className="px-3 py-3"><SeverityBadge severity={i.severity as Severity} /></td>
                     <td className="px-3 py-3 font-mono text-xs">{i.code}</td>
+                    <td className="px-3 py-3"><SeverityBadge severity={i.severity as Severity} /></td>
                     <td className="px-3 py-3">{typeMeta[i.type]}</td>
                     <td className="px-3 py-3">
                       <div>{i.location}</div>
@@ -323,6 +394,7 @@ function Incidents() {
                     </td>
                     <td className="px-3 py-3 text-xs">{i.officer ?? "—"}</td>
                     <td className="px-3 py-3 text-xs text-muted-foreground">{new Date(i.reported_at).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</td>
+                    <td className="px-3 py-3 text-xs text-muted-foreground">{formatDuration(i.reported_at)}</td>
                     <td className="px-3 py-3">
                       <span className={`text-[10px] uppercase tracking-wider font-medium ${
                         i.status === "resolved" ? "text-resolved" :
@@ -332,6 +404,38 @@ function Incidents() {
                         "text-muted-foreground"
                       }`}>{statusMeta[i.status]}</span>
                     </td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button onClick={() => navigate({ to: "/app/incidents/$id", params: { id: i.id } })} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-surface-2">
+                          <Eye className="h-3 w-3" /> Detail
+                        </button>
+                        <button onClick={() => navigate({ to: "/app/incidents/$id", params: { id: i.id } })} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-surface-2">
+                          <BrainCircuit className="h-3 w-3" /> AI Panel
+                        </button>
+                        {canManage && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelected(new Set([i.id]));
+                                setBulkOpen("assign");
+                              }}
+                              className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-surface-2"
+                            >
+                              <UserRoundPlus className="h-3 w-3" /> Assign
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelected(new Set([i.id]));
+                                setBulkOpen("status");
+                              }}
+                              className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[10px] uppercase tracking-wider hover:bg-surface-2"
+                            >
+                              <ListChecks className="h-3 w-3" /> Status
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -340,11 +444,37 @@ function Incidents() {
         )}
       </div>
 
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-xs">
+        <div className="text-muted-foreground">
+          Showing {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, filtered.length)} of {filtered.length}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-3 w-3" /> Prev
+          </button>
+          <div className="rounded border border-border bg-surface px-2 py-1">
+            Page {page} of {totalPages}
+          </div>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 disabled:opacity-40"
+          >
+            Next <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
       {showNew && activeOrg && (
         <IncidentReportForm
           organisationId={activeOrg.id}
           savedLocations={locations.map((l) => ({ id: l.id, name: l.name, coord_x: l.coord_x as number | null, coord_y: l.coord_y as number | null }))}
-          defaultZone={locations[0]?.name ?? "Lekki Phase 1"}
+          defaultZone={draft?.zone ?? locations[0]?.name ?? "Lekki Phase 1"}
+          initialDraft={draft ?? undefined}
           onClose={() => setShowNew(false)}
           onSubmit={(d) => createMut.mutate(d)}
           loading={createMut.isPending}
@@ -352,7 +482,7 @@ function Incidents() {
         />
       )}
 
-      {bulkOpen === "status" && (
+      {bulkOpen === "status" && canManage && (
         <BulkStatusDialog
           count={selected.size}
           onClose={() => setBulkOpen(null)}
@@ -360,7 +490,7 @@ function Incidents() {
           busy={bulkStatusMut.isPending}
         />
       )}
-      {bulkOpen === "assign" && (
+      {bulkOpen === "assign" && canManage && (
         <BulkAssignDialog
           members={members}
           count={selected.size}
@@ -392,6 +522,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function Pill({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "warning" | "critical" }) {
+  const cls =
+    tone === "critical"
+      ? "border-critical/30 bg-critical/10 text-critical"
+      : tone === "warning"
+        ? "border-high/30 bg-high/10 text-high"
+        : "border-border bg-surface text-foreground";
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${cls}`}>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </span>
+  );
+}
+
+function formatDuration(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.max(0, Math.floor(ms / 60000));
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m`;
 }
 
 function BulkStatusDialog({ count, onClose, onSubmit, busy }: { count: number; onClose: () => void; onSubmit: (s: IncidentStatus, n: string) => void; busy: boolean }) {

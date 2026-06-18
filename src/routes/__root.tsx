@@ -77,6 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Lemtik Security" },
       { name: "description", content: "**Lemtik Security** builds urban intelligence software that gives Lagos security managers real-time incident mapping, patrol tracking, and threat alerts." },
       { name: "author", content: "Lemtik Security" },
+      { name: "theme-color", content: "#0f172a" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { property: "og:title", content: "Lemtik Security" },
       { property: "og:description", content: "**Lemtik Security** builds urban intelligence software that gives Lagos security managers real-time incident mapping, patrol tracking, and threat alerts." },
       { property: "og:type", content: "website" },
@@ -91,6 +94,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         rel: "stylesheet",
         href: appCss,
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.webmanifest",
+      },
+      {
+        rel: "icon",
+        href: "/favicon.ico",
       },
     ],
   }),
@@ -119,6 +130,14 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch((error) => {
+          console.warn("Service worker registration failed", error);
+        });
+      });
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       router.invalidate();
       queryClient.invalidateQueries();

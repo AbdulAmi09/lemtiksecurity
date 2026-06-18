@@ -10,6 +10,8 @@ import {
 } from "@/lib/patrols.functions";
 import { getMapboxToken } from "@/lib/config.functions";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { supabase } from "@/integrations/supabase/client";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import {
   ArrowLeft, Plus, Trash2, Save, Copy, Archive, ArchiveRestore, Loader2,
   Crosshair, CalendarPlus, CheckCircle2, AlertTriangle, Siren, PlayCircle, StopCircle, MapPin,
@@ -17,6 +19,13 @@ import {
 
 export const Route = createFileRoute("/app/patrols/$id")({
   head: () => ({ meta: [{ title: "Patrol · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    requireSectionAccess(await resolveAppAccess(supabase), [
+      "security_manager",
+      "operator",
+      "client_admin",
+    ]);
+  },
   component: PatrolDetail,
 });
 

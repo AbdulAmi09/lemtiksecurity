@@ -142,3 +142,39 @@ export const sendTestAlert = createServerFn({ method: "POST" })
     if (error) throwSafeError("alerts.test", error, "Unable to send test alert.");
     return { ok: true };
   });
+
+export const createDispatchAlert = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      incident_id: z.string().uuid(),
+      recipient_user_id: z.string().uuid(),
+      title: z.string().min(1).max(120),
+      body: z.string().min(1).max(500),
+      action: z.string().max(120).optional(),
+      alert_type: z.string().min(1).max(40),
+      severity: z.number().int().min(1).max(5),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const orgId = await getActiveOrgId(context.supabase, context.userId);
+    const { error } = await context.supabase.from("alerts").insert({
+      organisation_id: orgId,
+      incident_id: data.incident_id,
+      title: data.title,
+      body: data.body,
+      action: data.action ?? "Open navigation",
+      channel: "push",
+      channels: ["push", "in-app"],
+      severity: data.severity,
+      recipients: 1,
+      alert_type: data.alert_type,
+      status: "delivered",
+      delivered_count: 1,
+      failed_count: 0,
+      recipient_user_ids: [data.recipient_user_id],
+      language: "en",
+    });
+    if (error) throwSafeError("alerts.dispatch", error, "Unable to create dispatch alert.");
+    return { ok: true };
+  });

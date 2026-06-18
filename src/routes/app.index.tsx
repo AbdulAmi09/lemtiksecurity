@@ -1,17 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { listIncidents } from "@/lib/incidents.functions";
-import { listPatrols } from "@/lib/patrols.functions";
+import { getPlatformDashboard } from "@/lib/platform.functions";
 import { weeklyTrend, zoneRisk, type Severity, type IncidentStatus } from "@/lib/mockData";
 import { SeverityBadge } from "@/components/SeverityBadge";
-import { ArrowUpRight, Activity, ShieldAlert, Clock, MapPin, Radar } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowUpRight, Activity, ShieldAlert, Clock, MapPin, Radar, Building2, Globe2, Server, CircleDotDashed, AlertTriangle, ReceiptText, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
+import { CommanderDashboard } from "@/components/dashboard/CommanderDashboard";
 
 export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Overview · Lemtik SOD" }] }),
+  beforeLoad: async () => {
+    const access = await resolveAppAccess(supabase);
+    if (access.specRole !== "lemtik_admin") {
+      requireSectionAccess(access, [
+        "security_manager",
+        "operator",
+        "client_admin",
+      ]);
+    }
+    return { appAccess: access };
+  },
   component: Overview,
 });
 
@@ -26,166 +34,214 @@ function timeAgo(iso: string) {
 }
 
 function Overview() {
-  const lIncidents = useServerFn(listIncidents);
-  const lPatrols = useServerFn(listPatrols);
-  const [firstName, setFirstName] = useState("Operator");
+  const { appAccess } = Route.useRouteContext();
+  if (appAccess.specRole === "lemtik_admin") {
+    return <PlatformDashboard />;
+  }
+  return <CommanderDashboard access={appAccess} />;
+}
 
-  useRealtimeInvalidate("incidents", [["incidents"]]);
-  useRealtimeInvalidate("patrols", [["patrols"]]);
+function PlatformDashboard() {
+  const loadPlatform = useServerFn(getPlatformDashboard);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["platform-dashboard"],
+    queryFn: () => loadPlatform(),
+  });
 
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      const { data: p } = await supabase.from("profiles").select("display_name").eq("user_id", data.user.id).maybeSingle();
-      const n = (p?.display_name || data.user.email || "Operator").split(" ")[0];
-      setFirstName(n);
-    });
-  }, []);
-
-  const { data: incidents = [] } = useQuery({ queryKey: ["incidents"], queryFn: () => lIncidents() });
-  const { data: patrols = [] } = useQuery({ queryKey: ["patrols"], queryFn: () => lPatrols() });
-
-  const open = incidents.filter((i) => i.status !== "resolved");
-  const critical = incidents.filter((i) => i.severity >= 4 && i.status !== "resolved").length;
-  const patrolCompliance = patrols.length
-    ? Math.round((patrols.reduce((acc, p) => acc + p.checked_in / Math.max(p.waypoints, 1), 0) / patrols.length) * 100)
-    : 0;
-
-  const max = Math.max(...weeklyTrend.map((w) => w.incidents));
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const stats = data?.stats;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Operations Overview</div>
-          <h1 className="mt-1 text-2xl font-semibold">{greeting}, {firstName}.</h1>
-          <p className="text-sm text-muted-foreground">
-            4 zones online · {open.length} active incidents · last sync just now
-          </p>
-        </div>
-        <Link
-          to="/app/incidents"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Log incident <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
+      <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
+        <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Platform Dashboard</div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Lemtik platform control</h1>
+        <p className="mt-2 max-w-3xl text-sm text-slate-300">
+          Bird&apos;s-eye view of the platform. This surface is limited to Lemtik internal administrators and excludes client operational detail.
+        </p>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Total organisations" value={stats ? stats.totalOrganisations.toString() : "—"} delta="all clients" icon={Building2} tone="muted" />
+        <StatCard label="Active subscriptions" value={stats ? stats.activeSubscriptions.toString() : "—"} delta="live plans" icon={ReceiptText} tone="resolved" />
+        <StatCard label="Incidents 30d" value={stats ? stats.incidentsLast30Days.toString() : "—"} delta="all orgs" icon={AlertTriangle} tone="critical" />
+        <StatCard label="Platform uptime" value={stats ? `${stats.uptime}%` : "—"} delta="service health" icon={Globe2} tone="resolved" />
+        <StatCard label="Active services" value={stats ? stats.activeServices.toString() : "—"} delta="online now" icon={Server} tone="high" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Stat label="Open incidents" value={open.length.toString()} delta="live count" icon={ShieldAlert} tone="critical" />
-        <Stat label="Critical (S4–S5)" value={critical.toString()} delta="needs attention" icon={Activity} tone="high" />
-        <Stat label="Avg response" value="4m 12s" delta="−38s this week" icon={Clock} tone="resolved" />
-        <Stat label="Patrol compliance" value={`${patrolCompliance}%`} delta={`${patrols.length} routes`} icon={Radar} tone="muted" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-lg border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
+      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-sm font-medium">Incident volume — last 7 days</div>
-              <div className="text-xs text-muted-foreground">Reported vs resolved · all zones</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Service health</div>
+              <h2 className="mt-1 text-lg font-semibold">Render services panel</h2>
             </div>
-            <span className="text-[11px] font-mono text-muted-foreground">trend</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
           </div>
-          <div className="flex items-end gap-3 h-44">
-            {weeklyTrend.map((d) => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex items-end justify-center gap-1 h-36">
-                  <div className="w-3 rounded-t bg-primary/70" style={{ height: `${(d.incidents / max) * 100}%` }} />
-                  <div className="w-3 rounded-t bg-accent/70" style={{ height: `${(d.resolved / max) * 100}%` }} />
-                </div>
-                <div className="text-[10px] font-mono text-muted-foreground">{d.day}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-4 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-primary/70" /> Reported</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-accent/70" /> Resolved</span>
-          </div>
-        </div>
 
-        <div className="rounded-lg border border-border bg-card p-5">
-          <div className="text-sm font-medium mb-1">Zone risk score</div>
-          <div className="text-xs text-muted-foreground mb-4">Composite 7-day index</div>
-          <div className="space-y-3">
-            {zoneRisk.map((z) => (
-              <div key={z.zone}>
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-medium">{z.zone}</span>
-                  <span className="font-mono text-muted-foreground">{z.score} · {z.trend}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${z.score}%`,
-                      background: z.score > 65 ? "var(--critical)" : z.score > 50 ? "var(--high)" : "var(--resolved)",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div className="text-sm font-medium">Active incidents</div>
-            <Link to="/app/incidents" className="text-[11px] text-muted-foreground hover:text-foreground">View all →</Link>
-          </div>
-          {open.length === 0 ? (
-            <div className="px-5 py-8 text-center text-xs text-muted-foreground">No active incidents. All clear.</div>
+          {isLoading ? (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-sm text-slate-300">
+              Loading platform health…
+            </div>
+          ) : error ? (
+            <div className="mt-5 rounded-2xl border border-red-300/20 bg-red-300/10 p-4 text-sm text-red-100">
+              {(error as Error).message}
+            </div>
           ) : (
-            <ul className="divide-y divide-border">
-              {open.slice(0, 5).map((i) => (
-                <li key={i.id} className="px-5 py-3 flex items-center gap-3">
-                  <SeverityBadge severity={i.severity as Severity} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{i.code} · {i.location}</div>
-                    <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                      <MapPin className="h-3 w-3" /> {i.zone} · {timeAgo(i.reported_at)}
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {data?.services.map((service) => (
+                <div key={service.id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">{service.name}</div>
+                      <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                        {service.status}
+                      </div>
+                    </div>
+                    <span className={`mt-0.5 inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.16em] ${
+                      service.status === "online"
+                        ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
+                        : service.status === "degraded"
+                          ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+                          : "border-red-300/20 bg-red-300/10 text-red-100"
+                    }`}>
+                      <CircleDotDashed className="h-3 w-3" />
+                      {service.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1.5 text-xs text-slate-300">
+                    <div>Last activity: {service.last_activity_at ? timeAgo(service.last_activity_at) : "—"}</div>
+                    <div>Last collection: {service.last_collection_at ? timeAgo(service.last_collection_at) : "—"}</div>
+                    <div>Items collected today: {service.items_collected_today}</div>
+                    <div>Error count 24h: {service.error_count_24h}</div>
+                  </div>
+                  {service.render_url && (
+                    <a
+                      href={service.render_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-cyan-200 hover:text-cyan-100"
+                    >
+                      Render URL <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Subscription overview</div>
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                <span className="text-slate-300">Active</span>
+                <span className="font-semibold text-white">{stats ? stats.activeSubscriptions : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                <span className="text-slate-300">Trial</span>
+                <span className="font-semibold text-white">{stats ? stats.trialSubscriptions : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-red-300/20 bg-red-300/10 px-4 py-3">
+                <span className="text-red-100">Overdue</span>
+                <span className="font-semibold text-red-50">{stats ? stats.overdueSubscriptions : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                <span className="text-slate-300">Revenue this month</span>
+                <span className="font-semibold text-white">{stats?.revenue ?? "—"}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Recent signups</div>
+            <div className="mt-4 space-y-3">
+              {(data?.recentSignups ?? []).length > 0 ? data!.recentSignups.map((org) => (
+                <div key={org.id} className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">{org.name}</div>
+                      <div className="mt-1 text-xs text-slate-300">
+                        {org.tier} · {org.status}
+                      </div>
+                    </div>
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                      {timeAgo(org.created_at)}
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{i.status as IncidentStatus}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div className="text-sm font-medium">Patrols on shift</div>
-            <Link to="/app/patrols" className="text-[11px] text-muted-foreground hover:text-foreground">View all →</Link>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+                  No recent signups.
+                </div>
+              )}
+            </div>
           </div>
-          {patrols.length === 0 ? (
-            <div className="px-5 py-8 text-center text-xs text-muted-foreground">No patrols scheduled yet.</div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {patrols.map((p) => (
-                <li key={p.id} className="px-5 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{p.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{p.officer} · {p.shift}</div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Recent client activity</div>
+            <div className="mt-4 space-y-3">
+              {(data?.recentActivity ?? []).length > 0 ? data!.recentActivity.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-white">{item.org}</div>
+                      <div className="mt-1 text-sm text-slate-300">{item.summary}</div>
+                    </div>
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                      {timeAgo(item.created_at)}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs font-mono">{p.checked_in}/{p.waypoints}</div>
-                    <div className={`text-[10px] uppercase tracking-wider font-medium ${
-                      p.status === "missed" ? "text-critical" :
-                      p.status === "delayed" ? "text-high" :
-                      p.status === "complete" ? "text-resolved" : "text-muted-foreground"
-                    }`}>{p.status.replace("_", " ")}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+                  No recent client activity.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  delta,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  delta: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: "critical" | "high" | "resolved" | "muted";
+}) {
+  const toneClass = {
+    critical: "text-critical bg-critical/10 border-critical/30",
+    high: "text-high bg-high/10 border-high/30",
+    resolved: "text-resolved bg-resolved/10 border-resolved/30",
+    muted: "text-muted-foreground bg-muted border-border",
+  }[tone];
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] uppercase tracking-wider text-slate-400">{label}</div>
+        <div className={`grid h-7 w-7 place-items-center rounded-md border ${toneClass}`}>
+          <Icon className="h-3.5 w-3.5" />
         </div>
       </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-white">{value}</div>
+      <div className="mt-0.5 text-[11px] text-slate-400">{delta}</div>
     </div>
   );
 }
