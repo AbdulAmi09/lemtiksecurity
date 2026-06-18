@@ -628,6 +628,7 @@ function IncidentDetailPage() {
                   </div>
                   <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
                     <MiniStat label="Zone" value={inc.zone} />
+                    <MiniStat label="Floor" value={inc.floor || "Not set"} />
                     <MiniStat label="Reported" value={fmt(reportedAt)} />
                     <MiniStat label="Time since reported" value={since(reportedAt)} />
                     <MiniStat label="Time open" value={timeOpen} />

@@ -16,6 +16,7 @@ export type IncidentSubmitPayload = {
   title?: string;
   location: string;
   zone: string;
+  floor?: string;
   description?: string;
   coord_x?: number;
   coord_y?: number;

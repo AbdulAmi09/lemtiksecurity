@@ -78,6 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "**Lemtik Security** builds urban intelligence software that gives Lagos security managers real-time incident mapping, patrol tracking, and threat alerts." },
       { name: "author", content: "Lemtik Security" },
       { name: "theme-color", content: "#0f172a" },
+      { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { property: "og:title", content: "Lemtik Security" },

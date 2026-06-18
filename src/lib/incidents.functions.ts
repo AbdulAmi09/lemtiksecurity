@@ -21,6 +21,7 @@ const incidentInput = z.object({
   title: z.string().max(100).optional(),
   location: z.string().min(1).max(200),
   zone: z.string().min(1).max(120),
+  floor: z.string().max(120).optional(),
   description: z.string().max(1000).optional(),
   officer: z.string().max(120).optional(),
   coord_x: z.number().optional(),

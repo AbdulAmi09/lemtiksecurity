@@ -362,6 +362,7 @@ export type Database = {
           evidence: Json
           id: string
           linked_incident_id: string | null
+          floor: string | null
           location: string
           location_id: string | null
           occurred_at: string
@@ -391,6 +392,7 @@ export type Database = {
           evidence?: Json
           id?: string
           linked_incident_id?: string | null
+          floor?: string | null
           location: string
           location_id?: string | null
           occurred_at?: string
@@ -420,6 +422,7 @@ export type Database = {
           evidence?: Json
           id?: string
           linked_incident_id?: string | null
+          floor?: string | null
           location?: string
           location_id?: string | null
           occurred_at?: string

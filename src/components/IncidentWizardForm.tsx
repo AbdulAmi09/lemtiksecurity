@@ -16,7 +16,6 @@ import {
   Sparkles,
   Square,
   Trash2,
-  Upload,
   Video,
   X,
   Zap,
@@ -50,7 +49,7 @@ export function IncidentWizardForm({
   organisationId: string;
   savedLocations: SavedLocation[];
   defaultZone: string;
-  initialDraft?: Partial<Pick<IncidentSubmitPayload, "type" | "severity" | "title" | "location" | "zone" | "description" | "coord_x" | "coord_y" | "location_id">>;
+  initialDraft?: Partial<Pick<IncidentSubmitPayload, "type" | "severity" | "title" | "location" | "zone" | "floor" | "description" | "coord_x" | "coord_y" | "location_id">>;
   onSubmit: (data: IncidentSubmitPayload) => void;
   loading: boolean;
   error: string | null;
@@ -64,7 +63,7 @@ export function IncidentWizardForm({
     zone: initialDraft?.zone ?? defaultZone,
     location: initialDraft?.location ?? "",
     addressFallback: initialDraft?.location ?? "",
-    floor: "",
+    floor: initialDraft?.floor ?? "",
     indoor: false,
     description: initialDraft?.description ?? "",
     coord_x: initialDraft?.coord_x as number | undefined,
@@ -541,6 +540,7 @@ export function IncidentWizardForm({
               <SummaryCard label="Title" value={form.title || "Untitled"} />
               <SummaryCard label="Location" value={form.addressFallback || form.location || "Unspecified"} />
               <SummaryCard label="Zone" value={form.zone} />
+              <SummaryCard label="Floor" value={form.indoor && form.floor ? form.floor : "Not set"} />
               <SummaryCard label="Coordinates" value={form.coord_x != null && form.coord_y != null ? `${Number(form.coord_y).toFixed(5)}, ${Number(form.coord_x).toFixed(5)}` : "None"} />
               <SummaryCard label="People" value={`${form.suspect_count || 0} suspect(s)`} />
               <SummaryCard label="Evidence" value={`${evidence.length} item(s)`} />
@@ -567,17 +567,14 @@ export function IncidentWizardForm({
   };
 
   const payload = useMemo<IncidentSubmitPayload>(() => {
-    const descriptionParts = [
-      form.indoor && form.floor ? `Indoor floor / zone: ${form.floor}` : "",
-      form.description.trim(),
-    ].filter(Boolean);
     return {
       type: form.type,
       severity: form.severity,
       title: form.title || undefined,
       location: form.location.trim() || form.addressFallback.trim() || "Unspecified",
       zone: form.zone,
-      description: descriptionParts.join("\n\n").slice(0, 1000) || undefined,
+      floor: form.indoor && form.floor ? form.floor.trim() : undefined,
+      description: form.description.trim() || undefined,
       coord_x: form.coord_x,
       coord_y: form.coord_y,
       location_id: form.location_id || null,
@@ -597,11 +594,11 @@ export function IncidentWizardForm({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm">
       <div className="min-h-full p-4 sm:p-6">
         <div className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
-          <div className="border-b border-border/70 bg-gradient-to-r from-primary/10 via-transparent to-resolved/10 px-5 py-4">
+          <div className="border-b border-border/70 bg-gradient-to-r from-primary/10 via-transparent to-resolved/10 px-4 py-4 sm:px-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Log incident</div>
-                <h2 className="mt-1 text-xl font-semibold">Step-by-step incident intake</h2>
+                <h2 className="mt-1 text-lg font-semibold sm:text-xl">Step-by-step incident intake</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Create the report, attach evidence, and hand it directly into the AI command flow.</p>
               </div>
               <button onClick={onClose} className="rounded-full border border-border bg-surface p-2 text-muted-foreground hover:bg-surface-2">
@@ -609,13 +606,13 @@ export function IncidentWizardForm({
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
               {STEP_TITLES.map((title, idx) => (
                 <button
                   key={title}
                   type="button"
                   onClick={() => setStep(idx)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-wider ${
+                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] uppercase tracking-wider ${
                     step === idx ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground"
                   }`}
                 >
@@ -631,47 +628,49 @@ export function IncidentWizardForm({
               e.preventDefault();
               onSubmit(payload);
             }}
-            className="grid gap-6 px-5 py-5 lg:grid-cols-[1.2fr_0.8fr]"
+            className="grid gap-5 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[1.2fr_0.8fr]"
           >
             <div className="space-y-5">
               {renderStep()}
 
               {error && <div className="rounded-xl border border-critical/40 bg-critical/10 px-3 py-2 text-xs text-critical">{error}</div>}
 
-              <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setStep((s) => Math.max(0, s - 1))}
-                  disabled={step === 0}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" /> Back
-                </button>
+              <div className="sticky bottom-0 z-20 -mx-4 border-t border-border/70 bg-card/95 px-4 pb-2 pt-4 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep((s) => Math.max(0, s - 1))}
+                    disabled={step === 0}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Back
+                  </button>
 
-                <div className="flex items-center gap-2">
-                  {step < STEP_TITLES.length - 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setStep((s) => Math.min(STEP_TITLES.length - 1, s + 1))}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
-                    >
-                      Next <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={loading || !!uploadingKind}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
-                    >
-                      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      Submit & Get AI Analysis
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {step < STEP_TITLES.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setStep((s) => Math.min(STEP_TITLES.length - 1, s + 1))}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                      >
+                        Next <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={loading || !!uploadingKind}
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+                      >
+                        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        Submit & Get AI Analysis
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <aside className="space-y-4">
+            <aside className="hidden space-y-4 lg:block">
               <div className="rounded-2xl border border-border bg-surface p-4">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Live summary</div>
                 <div className="mt-3 space-y-2">
@@ -679,6 +678,7 @@ export function IncidentWizardForm({
                   <PreviewLine label="Severity" value={`S${form.severity} · ${severityMeta[form.severity].label}`} />
                   <PreviewLine label="Location" value={form.addressFallback || form.location || "Unspecified"} />
                   <PreviewLine label="Zone" value={form.zone} />
+                  <PreviewLine label="Floor" value={form.indoor && form.floor ? form.floor : "Not set"} />
                   <PreviewLine label="Suspects" value={form.suspect_count || "0"} />
                   <PreviewLine label="Evidence" value={`${evidence.length} file(s)`} />
                 </div>
