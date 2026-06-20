@@ -31,6 +31,8 @@ import { Route as AppPatrolsRouteImport } from './routes/app.patrols'
 import { Route as AppOrgRouteImport } from './routes/app.org'
 import { Route as AppMapRouteImport } from './routes/app.map'
 import { Route as AppLocationsRouteImport } from './routes/app.locations'
+import { Route as AppInventoryRouteImport } from './routes/app.inventory'
+import { Route as AppIntelligenceRouteImport } from './routes/app.intelligence'
 import { Route as AppIncidentsRouteImport } from './routes/app.incidents'
 import { Route as AppAuditRouteImport } from './routes/app.audit'
 import { Route as AppAlertsRouteImport } from './routes/app.alerts'
@@ -155,6 +157,16 @@ const AppLocationsRoute = AppLocationsRouteImport.update({
   path: '/locations',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInventoryRoute = AppInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIntelligenceRoute = AppIntelligenceRouteImport.update({
+  id: '/intelligence',
+  path: '/intelligence',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppIncidentsRoute = AppIncidentsRouteImport.update({
   id: '/incidents',
   path: '/incidents',
@@ -232,6 +244,8 @@ export interface FileRoutesByFullPath {
   '/app/alerts': typeof AppAlertsRoute
   '/app/audit': typeof AppAuditRoute
   '/app/incidents': typeof AppIncidentsRouteWithChildren
+  '/app/intelligence': typeof AppIntelligenceRoute
+  '/app/inventory': typeof AppInventoryRoute
   '/app/locations': typeof AppLocationsRoute
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
@@ -267,6 +281,8 @@ export interface FileRoutesByTo {
   '/app/alerts': typeof AppAlertsRoute
   '/app/audit': typeof AppAuditRoute
   '/app/incidents': typeof AppIncidentsRouteWithChildren
+  '/app/intelligence': typeof AppIntelligenceRoute
+  '/app/inventory': typeof AppInventoryRoute
   '/app/locations': typeof AppLocationsRoute
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
@@ -305,6 +321,8 @@ export interface FileRoutesById {
   '/app/alerts': typeof AppAlertsRoute
   '/app/audit': typeof AppAuditRoute
   '/app/incidents': typeof AppIncidentsRouteWithChildren
+  '/app/intelligence': typeof AppIntelligenceRoute
+  '/app/inventory': typeof AppInventoryRoute
   '/app/locations': typeof AppLocationsRoute
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
@@ -344,6 +362,8 @@ export interface FileRouteTypes {
     | '/app/alerts'
     | '/app/audit'
     | '/app/incidents'
+    | '/app/intelligence'
+    | '/app/inventory'
     | '/app/locations'
     | '/app/map'
     | '/app/org'
@@ -379,6 +399,8 @@ export interface FileRouteTypes {
     | '/app/alerts'
     | '/app/audit'
     | '/app/incidents'
+    | '/app/intelligence'
+    | '/app/inventory'
     | '/app/locations'
     | '/app/map'
     | '/app/org'
@@ -416,6 +438,8 @@ export interface FileRouteTypes {
     | '/app/alerts'
     | '/app/audit'
     | '/app/incidents'
+    | '/app/intelligence'
+    | '/app/inventory'
     | '/app/locations'
     | '/app/map'
     | '/app/org'
@@ -609,6 +633,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLocationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inventory': {
+      id: '/app/inventory'
+      path: '/inventory'
+      fullPath: '/app/inventory'
+      preLoaderRoute: typeof AppInventoryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/intelligence': {
+      id: '/app/intelligence'
+      path: '/intelligence'
+      fullPath: '/app/intelligence'
+      preLoaderRoute: typeof AppIntelligenceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/incidents': {
       id: '/app/incidents'
       path: '/incidents'
@@ -756,6 +794,8 @@ interface AppRouteChildren {
   AppAlertsRoute: typeof AppAlertsRoute
   AppAuditRoute: typeof AppAuditRoute
   AppIncidentsRoute: typeof AppIncidentsRouteWithChildren
+  AppIntelligenceRoute: typeof AppIntelligenceRoute
+  AppInventoryRoute: typeof AppInventoryRoute
   AppLocationsRoute: typeof AppLocationsRoute
   AppMapRoute: typeof AppMapRoute
   AppOrgRoute: typeof AppOrgRoute
@@ -773,6 +813,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppAlertsRoute: AppAlertsRoute,
   AppAuditRoute: AppAuditRoute,
   AppIncidentsRoute: AppIncidentsRouteWithChildren,
+  AppIntelligenceRoute: AppIntelligenceRoute,
+  AppInventoryRoute: AppInventoryRoute,
   AppLocationsRoute: AppLocationsRoute,
   AppMapRoute: AppMapRoute,
   AppOrgRoute: AppOrgRoute,

@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Plus,
   ServerCrash,
+  ShieldAlert,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,8 +33,11 @@ const nav = [
   { to: "/app/map", label: "Live Map", icon: Map, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
   { to: "/app/incidents", label: "Incidents", icon: AlertTriangle, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
   { to: "/app/patrols", label: "Patrols", icon: Radar, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/intelligence", label: "Intelligence", icon: ShieldAlert, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/inventory", label: "Inventory", icon: MapPin, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
   { to: "/app/alerts", label: "Alerts", icon: Bell, allowed: ["security_manager", "operator"] as SpecRole[] },
-  { to: "/app/reports", label: "Reports", icon: BarChart3, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/reports", label: "Analytics", icon: BarChart3, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
+  { to: "/app/report-centre", label: "Report Centre", icon: ReceiptText, allowed: ["security_manager", "operator", "client_admin"] as SpecRole[] },
   { to: "/app/locations", label: "Locations", icon: MapPin, allowed: ["security_manager", "client_admin"] as SpecRole[] },
   { to: "/app/users", label: "Team", icon: Users, allowed: ["security_manager", "client_admin"] as SpecRole[] },
   { to: "/app/org", label: "Organisation", icon: Building2, allowed: ["security_manager", "client_admin"] as SpecRole[] },

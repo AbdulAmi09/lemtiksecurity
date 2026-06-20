@@ -20,11 +20,13 @@ import {
 export const Route = createFileRoute("/app/patrols/$id")({
   head: () => ({ meta: [{ title: "Patrol · Lemtik SOD" }] }),
   beforeLoad: async () => {
-    requireSectionAccess(await resolveAppAccess(supabase), [
+    const appAccess = await resolveAppAccess(supabase);
+    requireSectionAccess(appAccess, [
       "security_manager",
       "operator",
       "client_admin",
     ]);
+    return { appAccess };
   },
   component: PatrolDetail,
 });
@@ -42,6 +44,8 @@ type Waypoint = {
 
 function PatrolDetail() {
   const { id } = Route.useParams();
+  const { appAccess } = Route.useRouteContext();
+  const canManage = appAccess.specRole === "security_manager";
   const qc = useQueryClient();
   const getP = useServerFn(getPatrol);
   const saveWp = useServerFn(saveWaypoints);
@@ -104,6 +108,7 @@ function PatrolDetail() {
     m.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
     m.on("load", () => requestAnimationFrame(() => m.resize()));
     m.on("click", (e) => {
+      if (!canManage) return;
       setWaypoints((prev) => {
         const next: Waypoint = {
           ord: prev.length, name: `Waypoint ${prev.length + 1}`,
@@ -117,7 +122,7 @@ function PatrolDetail() {
     const ro = new ResizeObserver(() => { try { m.resize(); } catch {} });
     if (mapEl.current) ro.observe(mapEl.current);
     return () => { ro.disconnect(); m.remove(); mapRef.current = null; };
-  }, [token?.token]);
+  }, [token?.token, canManage]);
 
   // Redraw markers + line on waypoint changes
   useEffect(() => {
@@ -195,10 +200,10 @@ function PatrolDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => dupMut.mutate()} disabled={dupMut.isPending} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-surface-2 disabled:opacity-60">
+          <button onClick={() => { if (canManage) dupMut.mutate(); }} disabled={!canManage || dupMut.isPending} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-surface-2 disabled:opacity-60">
             <Copy className="h-3.5 w-3.5" /> Duplicate
           </button>
-          <button onClick={() => archMut.mutate(!archived)} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-surface-2">
+          <button onClick={() => { if (canManage) archMut.mutate(!archived); }} disabled={!canManage} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:bg-surface-2 disabled:opacity-60">
             {archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
             {archived ? "Restore" : "Archive"}
           </button>
@@ -259,15 +264,15 @@ function PatrolDetail() {
       </div>
 
       {/* Details */}
-      <section className="rounded-lg border border-border bg-card p-5 space-y-3">
+      <section className={`rounded-lg border border-border bg-card p-5 space-y-3 ${canManage ? "" : "opacity-75"}`}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <F label="Route name"><input className="inp" value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} /></F>
-          <F label="Default officer"><input className="inp" value={details.officer} onChange={(e) => setDetails({ ...details, officer: e.target.value })} /></F>
-          <F label="Shift window"><input className="inp" value={details.shift} onChange={(e) => setDetails({ ...details, shift: e.target.value })} placeholder="18:00 – 06:00" /></F>
-          <F label="Total duration (min)"><input type="number" min={5} max={720} className="inp" value={details.total_duration_minutes} onChange={(e) => setDetails({ ...details, total_duration_minutes: Number(e.target.value) })} /></F>
-          <F label="Grace period (min)"><input type="number" min={1} max={60} className="inp" value={details.grace_period_minutes} onChange={(e) => setDetails({ ...details, grace_period_minutes: Number(e.target.value) })} /></F>
+          <F label="Route name"><input disabled={!canManage} className="inp disabled:opacity-60" value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} /></F>
+          <F label="Default officer"><input disabled={!canManage} className="inp disabled:opacity-60" value={details.officer} onChange={(e) => setDetails({ ...details, officer: e.target.value })} /></F>
+          <F label="Shift window"><input disabled={!canManage} className="inp disabled:opacity-60" value={details.shift} onChange={(e) => setDetails({ ...details, shift: e.target.value })} placeholder="18:00 – 06:00" /></F>
+          <F label="Total duration (min)"><input disabled={!canManage} type="number" min={5} max={720} className="inp disabled:opacity-60" value={details.total_duration_minutes} onChange={(e) => setDetails({ ...details, total_duration_minutes: Number(e.target.value) })} /></F>
+          <F label="Grace period (min)"><input disabled={!canManage} type="number" min={1} max={60} className="inp disabled:opacity-60" value={details.grace_period_minutes} onChange={(e) => setDetails({ ...details, grace_period_minutes: Number(e.target.value) })} /></F>
           <F label="Check-in method">
-            <select className="inp" value={details.checkin_method} onChange={(e) => setDetails({ ...details, checkin_method: e.target.value as any })}>
+            <select disabled={!canManage} className="inp disabled:opacity-60" value={details.checkin_method} onChange={(e) => setDetails({ ...details, checkin_method: e.target.value as any })}>
               <option value="gps">GPS (50m radius)</option>
               <option value="qr">QR code at waypoint</option>
               <option value="nfc">NFC tag (enterprise)</option>
@@ -275,20 +280,20 @@ function PatrolDetail() {
           </F>
         </div>
         <div className="flex justify-end">
-          <button onClick={() => updMut.mutate()} disabled={updMut.isPending} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+          <button onClick={() => { if (canManage) updMut.mutate(); }} disabled={!canManage || updMut.isPending} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
             {updMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save details
           </button>
         </div>
       </section>
 
       {/* Route builder */}
-      <section className="rounded-lg border border-border bg-card p-5">
+      <section className={`rounded-lg border border-border bg-card p-5 ${canManage ? "" : "opacity-75"}`}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-sm font-semibold">Route waypoints</h2>
             <p className="text-xs text-muted-foreground">Click the map to add a waypoint. Drag-free list below — edit name & expected time.</p>
           </div>
-          <button onClick={() => saveWpMut.mutate()} disabled={saveWpMut.isPending} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+          <button onClick={() => { if (canManage) saveWpMut.mutate(); }} disabled={!canManage || saveWpMut.isPending} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
             {saveWpMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save route
           </button>
         </div>
@@ -310,20 +315,20 @@ function PatrolDetail() {
               <div key={i} className={`rounded-md border p-2 ${activeWp === i ? "border-primary/50 bg-primary/5" : "border-border bg-surface"}`}>
                 <div className="flex items-center gap-2">
                   <span className="inline-grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">{i + 1}</span>
-                  <input className="inp h-7 flex-1" value={w.name} onChange={(e) => updateWp(i, { name: e.target.value })} />
-                  <button onClick={() => removeWp(i)} className="text-muted-foreground hover:text-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <input disabled={!canManage} className="inp h-7 flex-1 disabled:opacity-60" value={w.name} onChange={(e) => updateWp(i, { name: e.target.value })} />
+                  <button disabled={!canManage} onClick={() => removeWp(i)} className="text-muted-foreground hover:text-critical disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="mt-1.5 grid grid-cols-3 gap-1">
-                  <input className="inp h-7 text-[11px]" placeholder="lng" type="number" step="0.000001" value={w.coord_x ?? ""} onChange={(e) => updateWp(i, { coord_x: e.target.value === "" ? null : Number(e.target.value) })} />
-                  <input className="inp h-7 text-[11px]" placeholder="lat" type="number" step="0.000001" value={w.coord_y ?? ""} onChange={(e) => updateWp(i, { coord_y: e.target.value === "" ? null : Number(e.target.value) })} />
+                  <input disabled={!canManage} className="inp h-7 text-[11px] disabled:opacity-60" placeholder="lng" type="number" step="0.000001" value={w.coord_x ?? ""} onChange={(e) => updateWp(i, { coord_x: e.target.value === "" ? null : Number(e.target.value) })} />
+                  <input disabled={!canManage} className="inp h-7 text-[11px] disabled:opacity-60" placeholder="lat" type="number" step="0.000001" value={w.coord_y ?? ""} onChange={(e) => updateWp(i, { coord_y: e.target.value === "" ? null : Number(e.target.value) })} />
                   <div className="flex items-center gap-1">
-                    <input className="inp h-7 text-[11px]" type="number" min={1} max={120} value={w.expected_minutes} onChange={(e) => updateWp(i, { expected_minutes: Number(e.target.value) })} />
+                    <input disabled={!canManage} className="inp h-7 text-[11px] disabled:opacity-60" type="number" min={1} max={120} value={w.expected_minutes} onChange={(e) => updateWp(i, { expected_minutes: Number(e.target.value) })} />
                     <span className="text-[10px] text-muted-foreground">min</span>
                   </div>
                 </div>
               </div>
             ))}
-            <button onClick={addWp} className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-surface px-3 py-2 text-xs hover:bg-surface-2">
+            <button disabled={!canManage} onClick={addWp} className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-surface px-3 py-2 text-xs hover:bg-surface-2 disabled:opacity-60">
               <Plus className="h-3.5 w-3.5" /> Add waypoint
             </button>
           </div>
@@ -331,10 +336,10 @@ function PatrolDetail() {
       </section>
 
       {/* Shifts */}
-      <section className="rounded-lg border border-border bg-card p-5">
+      <section className={`rounded-lg border border-border bg-card p-5 ${canManage ? "" : "opacity-75"}`}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold">Shift schedule</h2>
-          <ScheduleShiftForm onSchedule={(v) => schedMut.mutate(v)} loading={schedMut.isPending} patrolId={id} defaultOfficer={details.officer} />
+          {canManage ? <ScheduleShiftForm onSchedule={(v) => schedMut.mutate(v)} loading={schedMut.isPending} patrolId={id} defaultOfficer={details.officer} /> : <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Read only</div>}
         </div>
         {shifts.length === 0 ? (
           <div className="rounded-md border border-dashed border-border bg-surface p-4 text-xs text-muted-foreground text-center">No shifts scheduled.</div>
@@ -346,7 +351,7 @@ function PatrolDetail() {
               </thead>
               <tbody>
                 {(shifts as any[]).map((s) => (
-                  <ShiftRow key={s.id} shift={s} onAction={(v) => shiftMut.mutate({ id: s.id, ...v })} loading={shiftMut.isPending} />
+                  <ShiftRow key={s.id} shift={s} onAction={(v) => shiftMut.mutate({ id: s.id, ...v })} loading={shiftMut.isPending} canManage={canManage} />
                 ))}
               </tbody>
             </table>
@@ -355,10 +360,10 @@ function PatrolDetail() {
       </section>
 
       {/* Check-in log */}
-      <section className="rounded-lg border border-border bg-card p-5">
+      <section className={`rounded-lg border border-border bg-card p-5 ${canManage ? "" : "opacity-75"}`}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold">Patrol log</h2>
-          <QuickCheckInTester shifts={shifts as any[]} waypoints={waypoints} onCheck={(v) => ciMut.mutate(v)} onSos={(v) => sosMut.mutate(v)} loading={ciMut.isPending || sosMut.isPending} />
+          {canManage ? <QuickCheckInTester shifts={shifts as any[]} waypoints={waypoints} onCheck={(v) => ciMut.mutate(v)} onSos={(v) => sosMut.mutate(v)} loading={ciMut.isPending || sosMut.isPending} /> : <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Read only</div>}
         </div>
         {checkins.length === 0 ? (
           <div className="rounded-md border border-dashed border-border bg-surface p-4 text-xs text-muted-foreground text-center">No check-ins yet.</div>
@@ -423,7 +428,7 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>{children}</label>;
 }
 
-function ShiftRow({ shift, onAction, loading }: { shift: any; onAction: (v: any) => void; loading: boolean }) {
+function ShiftRow({ shift, onAction, loading, canManage }: { shift: any; onAction: (v: any) => void; loading: boolean; canManage: boolean }) {
   const [notes, setNotes] = useState(shift.handover_notes ?? "");
   const [open, setOpen] = useState(false);
   const status = shift.status as string;
@@ -436,9 +441,9 @@ function ShiftRow({ shift, onAction, loading }: { shift: any; onAction: (v: any)
         <td className="px-3 py-2"><span className={`rounded-md border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${status === "active" ? "border-resolved/40 text-resolved bg-resolved/10" : status === "completed" ? "border-border text-muted-foreground" : status === "cancelled" ? "border-critical/40 text-critical bg-critical/10" : "border-border bg-surface"}`}>{status}</span></td>
         <td className="px-3 py-2 text-right">
           <div className="inline-flex items-center gap-1">
-            {status === "scheduled" && <button onClick={() => onAction({ start: true })} disabled={loading} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2"><PlayCircle className="h-3 w-3" /> Start</button>}
-            {status === "active" && <button onClick={() => onAction({ end: true })} disabled={loading} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2"><StopCircle className="h-3 w-3" /> End</button>}
-            <button onClick={() => setOpen((o) => !o)} className="rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2">Handover</button>
+            {canManage && status === "scheduled" && <button onClick={() => onAction({ start: true })} disabled={loading} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2"><PlayCircle className="h-3 w-3" /> Start</button>}
+            {canManage && status === "active" && <button onClick={() => onAction({ end: true })} disabled={loading} className="inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2"><StopCircle className="h-3 w-3" /> End</button>}
+            {canManage ? <button onClick={() => setOpen((o) => !o)} className="rounded border border-border bg-surface px-2 py-1 text-[11px] hover:bg-surface-2">Handover</button> : <span className="text-[11px] text-muted-foreground">View only</span>}
           </div>
         </td>
       </tr>
