@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordBlackboxAudit } from "@/lib/audit.server";
 import { buildUserInvitationEmail, sendResendEmail } from "@/lib/email.service";
 import { throwSafeError } from "@/lib/server-errors";
 import { getActiveOrgId } from "@/lib/orgs.server";
@@ -145,13 +146,13 @@ export const setUserActive = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("profiles").update({ is_active: data.is_active }).eq("user_id", data.user_id);
     if (error) throwSafeError("users.setActive", error, "Unable to update active state.");
-    // Audit
-    await context.supabase.from("audit_log").insert({
-      organisation_id: orgId,
-      actor_id: context.userId,
-      action: data.is_active ? "user.reactivated" : "user.deactivated",
-      entity: "user",
-      entity_id: data.user_id,
+    await recordBlackboxAudit({
+      orgId,
+      userId: context.userId,
+      actionType: data.is_active ? "user.reactivated" : "user.deactivated",
+      resourceType: "user",
+      resourceId: data.user_id,
+      actionDetail: { user_id: data.user_id, is_active: data.is_active } as any,
     });
     return { ok: true };
   });
@@ -228,13 +229,13 @@ export const createInvite = createServerFn({ method: "POST" })
       return { ok: true, invite, delivery_warning: inviteErr.message };
     }
 
-    await context.supabase.from("audit_log").insert({
-      organisation_id: orgId,
-      actor_id: context.userId,
-      action: "invite.sent",
-      entity: "invite",
-      entity_id: invite.id,
-      details: { email: invite.email, role: data.role },
+    await recordBlackboxAudit({
+      orgId,
+      userId: context.userId,
+      actionType: "invite.sent",
+      resourceType: "invite",
+      resourceId: invite.id,
+      actionDetail: { email: invite.email, role: data.role } as any,
     });
 
     return { ok: true, invite, delivery_warning: deliveryWarning };

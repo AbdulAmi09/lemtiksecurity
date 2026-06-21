@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordBlackboxAudit } from "@/lib/audit.server";
 import { throwSafeError } from "@/lib/server-errors";
 
 async function assertPlatformAdmin(supabase: any, userId: string) {
@@ -250,20 +251,18 @@ export const requestPlatformServiceRestart = createServerFn({ method: "POST" })
     if (error) throwSafeError("system.restart.lookup", error, "Unable to locate the service.");
     if (!service) throw new Error("Service not found.");
 
-    const { error: auditError } = await supabaseAdmin.from("audit_log").insert({
-      actor_id: context.userId,
-      actor_name: null,
-      organisation_id: null,
-      entity: "platform_service",
-      entity_id: service.id,
-      action: "service.restart_requested",
-      details: {
+    await recordBlackboxAudit({
+      orgId: null,
+      userId: context.userId,
+      actionType: "service.restart_requested",
+      resourceType: "platform_service",
+      resourceId: service.id,
+      actionDetail: {
         slug: service.slug,
         name: service.name,
         requested_at: new Date().toISOString(),
-      },
+      } as any,
     });
-    if (auditError) throwSafeError("system.restart.audit", auditError, "Unable to record the restart request.");
 
     const { error: eventError } = await supabaseAdmin.from("platform_events").insert({
       organisation_id: null,

@@ -28,6 +28,18 @@ import {
   UserRoundCheck,
 } from "lucide-react";
 
+const MAP_COLORS = {
+  red: "#f43f5e",
+  orange: "#fb923c",
+  amber: "#fbbf24",
+  yellow: "#fde047",
+  slate: "#64748b",
+  blue: "#3b82f6",
+  green: "#22c55e",
+  ink: "#111827",
+  white: "#ffffff",
+};
+
 type IncidentRow = {
   id: string;
   code: string;
@@ -569,8 +581,10 @@ function CommandMapPreview({
     () => ({
       type: "FeatureCollection" as const,
       features: locations
-        .filter((location) => location.geofence)
-        .map((location) => ({ type: "Feature" as const, geometry: location.geofence as any, properties: { name: location.name } })),
+        .flatMap((location) => {
+          const feature = toGeoJsonFeature(location.geofence);
+          return feature ? [{ ...feature, properties: { name: location.name } }] : [];
+        }),
     }),
     [locations],
   );
@@ -595,7 +609,7 @@ function CommandMapPreview({
         source: "incidents",
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": "hsl(0 84% 60%)",
+          "circle-color": MAP_COLORS.red,
           "circle-radius": ["step", ["get", "point_count"], 16, 5, 22, 15, 30],
           "circle-opacity": 0.78,
         },
@@ -609,15 +623,15 @@ function CommandMapPreview({
           "circle-color": [
             "match",
             ["get", "sev"],
-            5, "hsl(0 84% 60%)",
-            4, "hsl(24 95% 58%)",
-            3, "hsl(38 92% 55%)",
-            2, "hsl(48 96% 60%)",
-            "hsl(220 9% 55%)",
+            5, MAP_COLORS.red,
+            4, MAP_COLORS.orange,
+            3, MAP_COLORS.amber,
+            2, MAP_COLORS.yellow,
+            MAP_COLORS.slate,
           ],
           "circle-radius": 7,
           "circle-stroke-width": 2,
-          "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-color": MAP_COLORS.ink,
         },
       });
       map.addLayer({
@@ -642,14 +656,14 @@ function CommandMapPreview({
           "circle-color": [
             "match",
             ["get", "status"],
-            "complete", "hsl(142 71% 45%)",
-            "missed", "hsl(0 84% 60%)",
-            "delayed", "hsl(24 95% 58%)",
-            "hsl(217 91% 60%)",
+            "complete", MAP_COLORS.green,
+            "missed", MAP_COLORS.red,
+            "delayed", MAP_COLORS.orange,
+            MAP_COLORS.blue,
           ],
           "circle-radius": 6,
           "circle-stroke-width": 2,
-          "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-color": MAP_COLORS.ink,
         },
       });
       map.addSource("zones", { type: "geojson", data: zoneGeo });
@@ -657,13 +671,13 @@ function CommandMapPreview({
         id: "zones-fill",
         type: "fill",
         source: "zones",
-        paint: { "fill-color": "hsl(217 91% 60%)", "fill-opacity": 0.10 },
+        paint: { "fill-color": MAP_COLORS.blue, "fill-opacity": 0.10 },
       });
       map.addLayer({
         id: "zones-line",
         type: "line",
         source: "zones",
-        paint: { "line-color": "hsl(217 91% 60%)", "line-width": 1.4, "line-dasharray": [2, 2] },
+        paint: { "line-color": MAP_COLORS.blue, "line-width": 1.4, "line-dasharray": [2, 2] },
       });
 
       map.on("click", "incidents-point", (e) => {
@@ -758,6 +772,19 @@ function CommandMapPreview({
       </div>
     </div>
   );
+}
+
+function toGeoJsonFeature(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, any>;
+  if (item.type === "Feature" && item.geometry && typeof item.geometry === "object") return item;
+  if ((item.type === "Polygon" || item.type === "MultiPolygon" || item.type === "LineString" || item.type === "Point") && item.coordinates) {
+    return { type: "Feature" as const, geometry: { type: item.type, coordinates: item.coordinates }, properties: {} };
+  }
+  if (item.geometry && typeof item.geometry === "object" && item.geometry.type && item.geometry.coordinates) {
+    return { type: "Feature" as const, geometry: { type: item.geometry.type, coordinates: item.geometry.coordinates }, properties: {} };
+  }
+  return null;
 }
 
 function Card({ title, icon: Icon, children }: { title: string; icon: any; children: ReactNode }) {

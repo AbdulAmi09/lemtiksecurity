@@ -44,6 +44,17 @@ const WINDOWS: { value: Window; label: string; ms: number }[] = [
 ];
 const TYPE_OPTS: (IncidentType | "all")[] = ["all", "intrusion", "theft", "medical", "fire", "suspicious", "civil_unrest", "other"];
 const SMART_DEVICE_TYPES = ["Camera", "Door Sensor", "Barrier", "Radar"] as const;
+const MAP_COLORS = {
+  red: "#f43f5e",
+  orange: "#fb923c",
+  amber: "#fbbf24",
+  yellow: "#fde047",
+  slate: "#64748b",
+  blue: "#3b82f6",
+  green: "#22c55e",
+  ink: "#111827",
+  white: "#ffffff",
+};
 
 type MapMenuState = {
   x: number;
@@ -98,13 +109,26 @@ function riskColor(risk: number) {
 // Severity → CSS color (resolves design tokens to literal colors for mapbox paint)
 function severityColor(s: number): string {
   const map: Record<number, string> = {
-    5: "hsl(0 84% 60%)",      // critical / red
-    4: "hsl(24 95% 58%)",     // high / orange
-    3: "hsl(38 92% 55%)",     // medium / amber
-    2: "hsl(48 96% 60%)",     // low / yellow
-    1: "hsl(220 9% 55%)",     // info / grey
+    5: MAP_COLORS.red,      // critical / red
+    4: MAP_COLORS.orange,   // high / orange
+    3: MAP_COLORS.amber,    // medium / amber
+    2: MAP_COLORS.yellow,   // low / yellow
+    1: MAP_COLORS.slate,    // info / grey
   };
   return map[s] ?? map[3];
+}
+
+function toGeoJsonFeature(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, any>;
+  if (item.type === "Feature" && item.geometry && typeof item.geometry === "object") return item;
+  if ((item.type === "Polygon" || item.type === "MultiPolygon" || item.type === "LineString" || item.type === "Point") && item.coordinates) {
+    return { type: "Feature" as const, geometry: { type: item.type, coordinates: item.coordinates }, properties: {} };
+  }
+  if (item.geometry && typeof item.geometry === "object" && item.geometry.type && item.geometry.coordinates) {
+    return { type: "Feature" as const, geometry: { type: item.geometry.type, coordinates: item.geometry.coordinates }, properties: {} };
+  }
+  return null;
 }
 
 function LiveMap() {
@@ -497,14 +521,14 @@ function LiveMap() {
         paint: {
           "circle-color": [
             "step", ["get", "maxSev"],
-            "hsl(220 9% 55%)", 2,
-            "hsl(48 96% 60%)", 3,
-            "hsl(38 92% 55%)", 4,
-            "hsl(24 95% 58%)", 5,
-            "hsl(0 84% 60%)",
+            MAP_COLORS.slate, 2,
+            MAP_COLORS.yellow, 3,
+            MAP_COLORS.amber, 4,
+            MAP_COLORS.orange, 5,
+            MAP_COLORS.red,
           ],
           "circle-radius": ["step", ["get", "point_count"], 16, 5, 22, 20, 30],
-          "circle-stroke-width": 2, "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-width": 2, "circle-stroke-color": MAP_COLORS.ink,
           "circle-opacity": 0.9,
         },
       });
@@ -519,11 +543,11 @@ function LiveMap() {
         paint: {
           "circle-color": [
             "match", ["get", "sev"],
-            5, "hsl(0 84% 60%)", 4, "hsl(24 95% 58%)", 3, "hsl(38 92% 55%)",
-            2, "hsl(48 96% 60%)", "hsl(220 9% 55%)",
+            5, MAP_COLORS.red, 4, MAP_COLORS.orange, 3, MAP_COLORS.amber,
+            2, MAP_COLORS.yellow, MAP_COLORS.slate,
           ],
           "circle-radius": ["case", ["==", ["get", "critical"], 1], 9, 7],
-          "circle-stroke-width": 2, "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-width": 2, "circle-stroke-color": MAP_COLORS.ink,
         },
       });
       // Heatmap layer (toggled)
@@ -538,10 +562,10 @@ function LiveMap() {
           "heatmap-color": [
             "interpolate", ["linear"], ["heatmap-density"],
             0, "rgba(0,0,0,0)",
-            0.2, "hsl(220 100% 60% / 0.4)",
-            0.4, "hsl(48 96% 60% / 0.6)",
-            0.7, "hsl(24 95% 58% / 0.8)",
-            1, "hsl(0 84% 60% / 0.95)",
+            0.2, "rgba(59,130,246,0.4)",
+            0.4, "rgba(253,224,71,0.6)",
+            0.7, "rgba(251,146,60,0.8)",
+            1, "rgba(244,63,94,0.95)",
           ],
         },
       });
@@ -550,11 +574,11 @@ function LiveMap() {
       map.addSource("zones", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({
         id: "zones-fill", type: "fill", source: "zones",
-        paint: { "fill-color": "hsl(217 91% 60%)", "fill-opacity": 0.12 },
+        paint: { "fill-color": MAP_COLORS.blue, "fill-opacity": 0.12 },
       });
       map.addLayer({
         id: "zones-line", type: "line", source: "zones",
-        paint: { "line-color": "hsl(217 91% 60%)", "line-width": 1.5, "line-dasharray": [2, 2] },
+        paint: { "line-color": MAP_COLORS.blue, "line-width": 1.5, "line-dasharray": [2, 2] },
       });
 
       // Patrol source
@@ -564,12 +588,12 @@ function LiveMap() {
         paint: {
           "circle-color": [
             "match", ["get", "status"],
-            "complete", "hsl(142 71% 45%)",
-            "missed", "hsl(0 84% 60%)",
-            "delayed", "hsl(24 95% 58%)",
-            "hsl(217 91% 60%)",
+            "complete", MAP_COLORS.green,
+            "missed", MAP_COLORS.red,
+            "delayed", MAP_COLORS.orange,
+            MAP_COLORS.blue,
           ],
-          "circle-radius": 6, "circle-stroke-width": 2, "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-radius": 6, "circle-stroke-width": 2, "circle-stroke-color": MAP_COLORS.ink,
         },
       });
 
@@ -629,8 +653,10 @@ function LiveMap() {
   useEffect(() => {
     const map = mapRef.current; if (!map || !loadedRef.current) return;
     const features = (showZones ? locations : [])
-      .filter((l) => l.geofence)
-      .map((l) => ({ type: "Feature" as const, geometry: l.geofence as any, properties: { name: l.name } }));
+      .flatMap((l) => {
+        const feature = toGeoJsonFeature(l.geofence);
+        return feature ? [{ ...feature, properties: { name: l.name } }] : [];
+      });
     const src = map.getSource("zones") as mapboxgl.GeoJSONSource | undefined;
     src?.setData({ type: "FeatureCollection", features });
   }, [locations, showZones]);
@@ -755,10 +781,10 @@ function LiveMap() {
           "text-color": [
             "match",
             ["get", "severity"],
-            5, "hsl(0 84% 60%)",
-            4, "hsl(24 95% 58%)",
-            3, "hsl(38 92% 55%)",
-            "hsl(48 96% 60%)",
+            5, MAP_COLORS.red,
+            4, MAP_COLORS.orange,
+            3, MAP_COLORS.amber,
+            MAP_COLORS.yellow,
           ],
         },
       });
@@ -769,10 +795,10 @@ function LiveMap() {
         type: "circle",
         source: "command-officers",
         paint: {
-          "circle-color": "hsl(217 91% 60%)",
+          "circle-color": MAP_COLORS.blue,
           "circle-radius": 7,
           "circle-stroke-width": 2,
-          "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-color": MAP_COLORS.ink,
         },
       });
       map.addLayer({
@@ -797,10 +823,10 @@ function LiveMap() {
           "line-color": [
             "match",
             ["get", "status"],
-            "complete", "hsl(142 71% 45%)",
-            "missed", "hsl(0 84% 60%)",
-            "delayed", "hsl(24 95% 58%)",
-            "hsl(217 91% 60%)",
+            "complete", MAP_COLORS.green,
+            "missed", MAP_COLORS.red,
+            "delayed", MAP_COLORS.orange,
+            MAP_COLORS.blue,
           ],
           "line-width": 3,
           "line-opacity": 0.82,
@@ -817,14 +843,14 @@ function LiveMap() {
           "circle-color": [
             "match",
             ["get", "state"],
-            "complete", "hsl(142 71% 45%)",
-            "missed", "hsl(0 84% 60%)",
-            "pending", "hsl(220 9% 55%)",
-            "hsl(217 91% 60%)",
+            "complete", MAP_COLORS.green,
+            "missed", MAP_COLORS.red,
+            "pending", MAP_COLORS.slate,
+            MAP_COLORS.blue,
           ],
           "circle-radius": 4,
           "circle-stroke-width": 1,
-          "circle-stroke-color": "hsl(220 13% 9%)",
+          "circle-stroke-color": MAP_COLORS.ink,
         },
       });
     }
@@ -842,9 +868,9 @@ function LiveMap() {
           "text-color": [
             "match",
             ["get", "status"],
-            "offline", "hsl(0 84% 60%)",
-            "override", "hsl(24 95% 58%)",
-            "hsl(142 71% 45%)",
+            "offline", MAP_COLORS.red,
+            "override", MAP_COLORS.orange,
+            MAP_COLORS.green,
           ],
         },
       });
@@ -868,19 +894,19 @@ function LiveMap() {
     map.setPaintProperty("zones-fill", "fill-color", [
       "step",
       ["get", "risk"],
-      "hsl(142 71% 45%)",
-      45, "hsl(38 92% 55%)",
-      65, "hsl(24 95% 58%)",
-      80, "hsl(0 84% 60%)",
+      MAP_COLORS.green,
+      45, MAP_COLORS.amber,
+      65, MAP_COLORS.orange,
+      80, MAP_COLORS.red,
     ]);
     map.setPaintProperty("zones-fill", "fill-opacity", 0.12);
     map.setPaintProperty("zones-line", "line-color", [
       "step",
       ["get", "risk"],
-      "hsl(142 71% 45%)",
-      45, "hsl(38 92% 55%)",
-      65, "hsl(24 95% 58%)",
-      80, "hsl(0 84% 60%)",
+      MAP_COLORS.green,
+      45, MAP_COLORS.amber,
+      65, MAP_COLORS.orange,
+      80, MAP_COLORS.red,
     ]);
     map.setPaintProperty("command-patrol-line", "line-dasharray", [2, 1.2]);
 

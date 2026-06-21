@@ -133,7 +133,7 @@ function PatrolDetail() {
     waypoints.forEach((w, i) => {
       if (w.coord_x == null || w.coord_y == null) return;
       const el = document.createElement("div");
-      el.style.cssText = `width:22px;height:22px;border-radius:11px;background:hsl(217 91% 60%);color:#fff;display:grid;place-items:center;font:600 11px ui-sans-serif,system-ui;border:2px solid hsl(220 13% 9%);cursor:pointer`;
+      el.style.cssText = `width:22px;height:22px;border-radius:11px;background:#3b82f6;color:#fff;display:grid;place-items:center;font:600 11px ui-sans-serif,system-ui;border:2px solid #111827;cursor:pointer`;
       el.textContent = String(i + 1);
       el.onclick = (e) => { e.stopPropagation(); setActiveWp(i); };
       const mk = new mapboxgl.Marker(el).setLngLat([w.coord_x, w.coord_y]).addTo(m);
@@ -148,7 +148,7 @@ function PatrolDetail() {
       const src = m!.getSource(lineSrcId) as mapboxgl.GeoJSONSource | undefined;
       if (src) { src.setData(geo as any); return; }
       m!.addSource(lineSrcId, { type: "geojson", data: geo as any });
-      m!.addLayer({ id: lineSrcId, type: "line", source: lineSrcId, paint: { "line-color": "hsl(217 91% 60%)", "line-width": 2, "line-dasharray": [2, 2] } });
+      m!.addLayer({ id: lineSrcId, type: "line", source: lineSrcId, paint: { "line-color": "#3b82f6", "line-width": 2, "line-dasharray": [2, 2] } });
     }
   }, [waypoints]);
 

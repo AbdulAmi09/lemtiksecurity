@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordBlackboxAudit } from "@/lib/audit.server";
 import { buildWelcomeEmail, sendResendEmail } from "@/lib/email.service";
 import { throwSafeError } from "@/lib/server-errors";
 
@@ -287,13 +288,13 @@ export const createPlatformOrganisation = createServerFn({ method: "POST" })
       inviteUrl: redirectTo ?? invite.token,
     });
 
-    await context.supabase.from("audit_log").insert({
-      organisation_id: org.id,
-      actor_id: context.userId,
-      action: "organisation.created",
-      entity: "organisation",
-      entity_id: org.id,
-      details: { name: org.name, tier: org.subscription_tier },
+    await recordBlackboxAudit({
+      orgId: org.id,
+      userId: context.userId,
+      actionType: "organisation.created",
+      resourceType: "organisation",
+      resourceId: org.id,
+      actionDetail: { name: org.name, tier: org.subscription_tier } as any,
     });
 
     return { ok: true, org, location, invite, delivery_warning: emailErr?.message ?? deliveryWarning };
