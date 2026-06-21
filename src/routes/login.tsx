@@ -19,13 +19,60 @@ function LoginPage() {
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
+    const getLandingPath = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!mounted || !userData.user) return;
+
+      const { data: lemtikAdmin } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .eq("role", "lemtik_admin")
+        .maybeSingle();
+
+      if (lemtikAdmin) {
+        navigate({ to: "/app", replace: true });
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("active_organisation_id")
+        .eq("user_id", userData.user.id)
+        .maybeSingle();
+
+      if (!profile?.active_organisation_id) {
+        navigate({ to: "/onboarding", replace: true });
+        return;
+      }
+
+      const { data: membership } = await supabase
+        .from("organisation_members")
+        .select("role")
+        .eq("organisation_id", profile.active_organisation_id)
+        .eq("user_id", userData.user.id)
+        .maybeSingle();
+
+      const role = String(membership?.role ?? "officer");
+      navigate({ to: role === "officer" ? "/officer/home" : "/app", replace: true });
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) navigate({ to: "/app", replace: true });
+      if (session) {
+        void getLandingPath();
+      }
     });
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/app", replace: true });
+      if (data.user) {
+        void getLandingPath();
+      }
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {
