@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldHalf, Loader2 } from "lucide-react";
+import { ShieldHalf, Loader2, Mail, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in · Lemtik SOD" }] }),
@@ -13,7 +13,10 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -51,6 +54,30 @@ function LoginPage() {
     if (error) {
       setError(error.message);
       setLoading(false);
+    }
+  };
+
+  const sendPasswordReset = async () => {
+    const recoveryEmail = email.trim();
+    if (!recoveryEmail) {
+      setRecoveryMessage("Enter your email first, then request a reset link.");
+      setShowRecovery(true);
+      return;
+    }
+    setError(null);
+    setRecoveryMessage(null);
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setRecoveryMessage(`If an account exists for ${recoveryEmail}, a reset link has been sent.`);
+      setShowRecovery(false);
+    } catch (err) {
+      setRecoveryMessage((err as Error).message);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -130,11 +157,54 @@ function LoginPage() {
             </button>
 
             <div className="text-center">
-              <Link to="/forgot-password" className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryMessage(null);
+                  setShowRecovery((current) => !current);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              >
                 Forgot password?
-              </Link>
+              </button>
             </div>
           </form>
+
+          {showRecovery && (
+            <div className="mt-4 rounded-md border border-border bg-surface px-3 py-3">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <Mail className="h-3.5 w-3.5 text-primary" />
+                Send a reset link
+              </div>
+              <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                We&apos;ll send the reset link to the email above and open the password recovery flow.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={sendPasswordReset}
+                  disabled={resetLoading}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {resetLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Send reset link
+                </button>
+                <Link
+                  to="/forgot-password"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface/70"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Open page
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {recoveryMessage && (
+            <div className="mt-4 rounded-md border border-resolved/40 bg-resolved/10 px-3 py-2 text-xs text-resolved">
+              {recoveryMessage}
+            </div>
+          )}
 
           <p className="mt-4 text-center text-[11px] text-muted-foreground">
             Accounts are provisioned by a manager. Contact ops to request access.

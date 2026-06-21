@@ -1501,12 +1501,13 @@ Events server emits to officer PWA:
 ## Resend Email Integration
 
 ```
+All auth email via supabase
+
 All transactional email via Resend API
 Sender: Lemtik Security <alerts@lemtik.com.ng>
 
 Templates (React Email):
   Welcome email (new user invitation)
-  Password reset
   Daily incident log (PDF attached)
   Weekly security summary (PDF attached)
   Monthly threat analysis (PDF attached)

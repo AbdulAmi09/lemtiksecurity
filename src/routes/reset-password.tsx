@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldHalf, Loader2, CheckCircle2 } from "lucide-react";
+import { ShieldHalf, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({ meta: [{ title: "Set new password · Lemtik SOD" }] }),
@@ -19,6 +19,7 @@ const passwordSchema = z
 function ResetPasswordPage() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
+  const [linkState, setLinkState] = useState<"checking" | "ready" | "missing">("checking");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,12 +29,28 @@ function ResetPasswordPage() {
   // The recovery link sets a session via the URL hash. Wait for it.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        setReady(true);
+        setLinkState("ready");
+      }
     });
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
+      if (data.session) {
+        setReady(true);
+        setLinkState("ready");
+      } else {
+        setLinkState((current) => (current === "checking" ? "missing" : current));
+      }
     });
-    return () => subscription.unsubscribe();
+
+    const timeout = window.setTimeout(() => {
+      setLinkState((current) => (current === "checking" ? "missing" : current));
+    }, 6000);
+
+    return () => {
+      window.clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -88,6 +105,19 @@ function ResetPasswordPage() {
           ) : !ready ? (
             <div className="mt-5 text-xs text-muted-foreground flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Validating recovery link…
+            </div>
+          ) : linkState === "missing" ? (
+            <div className="mt-5 space-y-3">
+              <div className="rounded-md border border-amber-300/40 bg-amber-300/10 px-3 py-3 text-xs text-amber-200">
+                This recovery link is missing, expired, or already used. Request a fresh reset email to continue.
+              </div>
+              <Link
+                to="/forgot-password"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground hover:bg-surface/70"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Request a new reset link
+              </Link>
             </div>
           ) : (
             <form onSubmit={submit} className="mt-5 space-y-3">
