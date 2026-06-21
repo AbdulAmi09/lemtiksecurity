@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { listMembers, updateMemberRole, removeMember } from "@/lib/orgs.functions";
+import { listMembers, listLocations, updateMemberRole, removeMember } from "@/lib/orgs.functions";
 import {
   listInvites, createInvite, resendInvite, cancelInvite, bulkInvite, setUserActive,
 } from "@/lib/users.functions";
@@ -48,6 +48,7 @@ function roleLabel(r: string) {
 function Users() {
   const qc = useQueryClient();
   const list = useServerFn(listMembers);
+  const listLoc = useServerFn(listLocations);
   const assign = useServerFn(updateMemberRole);
   const remove = useServerFn(removeMember);
   const lInv = useServerFn(listInvites);
@@ -63,6 +64,9 @@ function Users() {
   const { data: invites = [] } = useQuery({
     queryKey: ["org-invites"], queryFn: () => lInv(),
   });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["org-locations"], queryFn: () => listLoc(),
+  });
 
   const [tab, setTab] = useState<"members" | "invites">("members");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -71,6 +75,10 @@ function Users() {
   const [bulkText, setBulkText] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [assignedLocations, setAssignedLocations] = useState<string[]>([]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["org-members"] });
@@ -90,8 +98,8 @@ function Users() {
     onSuccess: refresh,
   });
   const inviteMut = useMutation({
-    mutationFn: () => cInv({ data: { email: email.trim(), role } }),
-    onSuccess: () => { setEmail(""); setInviteOpen(false); refresh(); },
+    mutationFn: () => cInv({ data: { email: email.trim(), role, assigned_location_ids: assignedLocations } }),
+    onSuccess: () => { setEmail(""); setAssignedLocations([]); setInviteOpen(false); refresh(); },
   });
   const bulkMut = useMutation({
     mutationFn: () => {
@@ -114,6 +122,16 @@ function Users() {
 
   const visibleMembers = members.filter((m: any) => showInactive || m.profile?.is_active !== false);
   const pendingInvites = invites.filter((i: any) => i.status === "pending");
+  const filteredMembers = visibleMembers.filter((m: any) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q
+      || [m.profile?.display_name, m.email, m.profile?.phone, m.role, m.user_id]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q));
+    const matchesRole = roleFilter === "all" || m.role === roleFilter;
+    const matchesStatus = statusFilter === "all" || (m.profile?.status ?? "off-duty") === statusFilter;
+    return matchesSearch && matchesRole && matchesStatus;
+  });
   const metrics = useMemo(() => {
     const activeMembers = members.filter((m: any) => m.profile?.is_active !== false);
     const onDuty = activeMembers.filter((m: any) => m.profile?.status === "on-duty").length;
@@ -158,6 +176,25 @@ function Users() {
             {t === "members" ? "Members" : `Invites${pendingInvites.length ? ` (${pendingInvites.length})` : ""}`}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or email"
+          className="w-72 rounded-md border border-border bg-surface px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-ring"
+        />
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="rounded-md border border-border bg-surface px-3 py-2 text-xs">
+          <option value="all">All roles</option>
+          {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-md border border-border bg-surface px-3 py-2 text-xs">
+          <option value="all">All statuses</option>
+          <option value="on-duty">On duty</option>
+          <option value="off-duty">Off duty</option>
+          <option value="break">Break</option>
+        </select>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -229,15 +266,16 @@ function Users() {
               <thead className="bg-surface text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium">Member</th>
+                  <th className="text-left px-4 py-3 font-medium">Email</th>
+                  <th className="text-left px-4 py-3 font-medium">Phone</th>
                   <th className="text-left px-4 py-3 font-medium">Role</th>
-                  <th className="text-left px-4 py-3 font-medium">Zone</th>
                   <th className="text-left px-4 py-3 font-medium">Status</th>
                   <th className="text-left px-4 py-3 font-medium">Last seen</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visibleMembers.map((m: any) => {
+                {filteredMembers.map((m: any) => {
                   const name = m.profile?.display_name || "Operator";
                   const isActive = m.profile?.is_active !== false;
                   return (
@@ -253,6 +291,8 @@ function Users() {
                           </div>
                         </Link>
                       </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{m.email ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{m.profile?.phone ?? "—"}</td>
                       <td className="px-4 py-3 text-xs">
                         <div className="inline-flex items-center gap-2">
                           <ShieldCheck className="h-3.5 w-3.5 text-primary" />
@@ -266,7 +306,6 @@ function Users() {
                           </select>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs">{m.profile?.zone ?? "—"}</td>
                       <td className="px-4 py-3">
                         {!isActive ? (
                           <span className="inline-flex rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-critical">
@@ -305,8 +344,8 @@ function Users() {
                     </tr>
                   );
                 })}
-                {visibleMembers.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">No members.</td></tr>
+                {filteredMembers.length === 0 && (
+                  <tr><td colSpan={7} className="p-8 text-center text-sm text-muted-foreground">No members.</td></tr>
                 )}
               </tbody>
             </table>
@@ -404,10 +443,32 @@ function Users() {
                     {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                   </select>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Assigned locations</label>
+                  <div className="max-h-40 space-y-1 overflow-auto rounded-md border border-border bg-surface p-2 text-xs">
+                    {locations.length === 0 ? (
+                      <div className="px-1 py-2 text-muted-foreground">No locations configured yet.</div>
+                    ) : locations.map((location: any) => (
+                      <label key={location.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-background">
+                        <input
+                          type="checkbox"
+                          checked={assignedLocations.includes(location.id)}
+                          onChange={(e) => {
+                            setAssignedLocations((current) =>
+                              e.target.checked ? [...current, location.id] : current.filter((id) => id !== location.id),
+                            );
+                          }}
+                        />
+                        <span className="font-medium">{location.name}</span>
+                        <span className="text-muted-foreground">{location.address ?? ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <button type="submit" disabled={inviteMut.isPending || !email.trim()}
                   className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                   {inviteMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-                  Send invite
+                  Send email invite
                 </button>
               </form>
             ) : (

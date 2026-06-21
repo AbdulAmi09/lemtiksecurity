@@ -13,6 +13,7 @@ import { useRealtimeInvalidate } from "@/lib/useRealtime";
 import type { AppAccess } from "@/lib/rbac";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { typeMeta, statusMeta } from "@/lib/mockData";
+import { orgRoom, useRealtimeEventFeed } from "@/lib/realtime.events";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -116,6 +117,7 @@ export function CommanderDashboard({ access }: { access: AppAccess }) {
   const { data: locations = [], isLoading: locationsLoading } = useQuery({ queryKey: ["command-locations"], queryFn: () => loadLocations() as Promise<LocationRow[]> });
   const { data: checkIns = [], isLoading: checkInsLoading } = useQuery({ queryKey: ["command-checkins"], queryFn: () => loadCheckIns() as Promise<CheckInRow[]> });
   const { data: tokenData } = useQuery({ queryKey: ["command-mapbox-token"], queryFn: () => loadToken(), staleTime: Infinity });
+  const liveEvents = useRealtimeEventFeed(access.orgId ? orgRoom(access.orgId) : null, 5);
 
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [clock, setClock] = useState("");
@@ -368,6 +370,30 @@ export function CommanderDashboard({ access }: { access: AppAccess }) {
                 </div>
               ))}
               {!sortedActiveIncidents.length && <EmptyState>No active incidents right now.</EmptyState>}
+            </div>
+          </Card>
+
+          <Card title="Realtime events" icon={Signal}>
+            <div className="space-y-3">
+              {liveEvents.length === 0 ? (
+                <EmptyState>No live events yet.</EmptyState>
+              ) : (
+                liveEvents.map((event) => (
+                  <div key={`${event.event}-${event.at}`} className="rounded-2xl border border-border bg-surface p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold">{event.event}</div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                          {JSON.stringify(event.payload)}
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                        {new Intl.DateTimeFormat("en-NG", { timeStyle: "short", hour12: false }).format(new Date(event.at))}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 

@@ -326,17 +326,90 @@ export const sosAlert = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const orgId = await getActiveOrgId(context.supabase, context.userId);
     const { data: prof } = await context.supabase.from("profiles").select("display_name").eq("user_id", context.userId).maybeSingle();
+    const { data: recipients } = await context.supabase
+      .from("organisation_members")
+      .select("user_id, role")
+      .eq("organisation_id", orgId)
+      .in("role", ["supervisor", "manager", "client_admin", "lemtik_admin"]);
     const name = prof?.display_name ?? "Officer";
-    // Officers can trigger SOS; alerts table policy requires leadership for insert,
-    // so use admin client to broadcast.
+    const locationLabel = data.note?.trim() || (data.coord_x != null && data.coord_y != null ? "Officer live location" : "Officer emergency location");
+    const coordsLabel = data.coord_x != null && data.coord_y != null
+      ? ` @ ${data.coord_y.toFixed(5)},${data.coord_x.toFixed(5)}`
+      : "";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error, data: row } = await supabaseAdmin.from("alerts").insert({
-      severity: 5, channel: "in-app",
-      title: `SOS from ${name}${data.note ? ` — ${data.note}` : ""}${data.coord_x != null ? ` @ ${data.coord_y?.toFixed(5)},${data.coord_x?.toFixed(5)}` : ""}`,
-      organisation_id: orgId, recipients: 0, acknowledged: false,
+    const incidentPayload = {
+      organisation_id: orgId,
+      reported_by: context.userId,
+      type: "other",
+      severity: 5,
+      title: `SOS from ${name}`,
+      location: locationLabel,
+      zone: "Emergency",
+      description: data.note ? `SOS trigger: ${data.note}` : "Officer triggered SOS emergency alert.",
+      status: "reported",
+      coord_x: data.coord_x ?? null,
+      coord_y: data.coord_y ?? null,
+      shift_id: data.shift_id ?? null,
+      client_visible: true,
+      quick_report: true,
+      occurred_at: new Date().toISOString(),
+      suspect_count: 0,
+    };
+    const { data: incident, error: incidentError } = await supabaseAdmin
+      .from("incidents")
+      .insert(incidentPayload)
+      .select()
+      .single();
+    if (incidentError) throwSafeError("sos.incident", incidentError, "Unable to create SOS incident.");
+
+    const recipientIds = Array.from(new Set((recipients ?? []).map((row) => row.user_id).filter(Boolean)));
+    const { error: alertError, data: alert } = await supabaseAdmin.from("alerts").insert({
+      severity: 5,
+      channel: "push",
+      channels: ["push", "in-app", "whatsapp", "sms"],
+      title: `SOS from ${name}`,
+      body: `Emergency alert${coordsLabel}. ${data.note ? `Note: ${data.note}` : "Immediate response required."}`,
+      action: "Open incident",
+      organisation_id: orgId,
+      incident_id: incident.id,
+      recipients: Math.max(recipientIds.length, 1),
+      alert_type: "sos",
+      status: "delivered",
+      delivered_count: Math.max(recipientIds.length, 1),
+      failed_count: 0,
+      recipient_user_ids: recipientIds,
+      acknowledged: false,
+      language: "en",
     }).select().single();
-    if (error) throwSafeError("sos", error, "Unable to broadcast SOS.");
-    return row;
+    if (alertError) throwSafeError("sos.alert", alertError, "Unable to broadcast SOS.");
+
+    const { error: activityError } = await supabaseAdmin.from("incident_activity").insert({
+      incident_id: incident.id,
+      organisation_id: orgId,
+      actor_id: context.userId,
+      actor_name: name,
+      kind: "sos_triggered",
+      message: `SOS triggered by ${name}${coordsLabel}.`,
+      meta: {
+        shift_id: data.shift_id ?? null,
+        coord_x: data.coord_x ?? null,
+        coord_y: data.coord_y ?? null,
+        note: data.note ?? null,
+        recipients: recipientIds,
+      },
+    });
+    if (activityError) throwSafeError("sos.activity", activityError, "Unable to log SOS activity.");
+
+    await recordAuditEvent({
+      actorId: context.userId,
+      organisationId: orgId,
+      entity: "incident",
+      entityId: incident.id,
+      action: "sos_triggered",
+      details: { alert_id: alert?.id ?? null, shift_id: data.shift_id ?? null, recipients: recipientIds.length },
+    });
+
+    return { incident, alert, recipients: recipientIds.length };
   });
 
 // Existing waypoint check-in (legacy quick increment) kept for compatibility

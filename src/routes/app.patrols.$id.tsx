@@ -10,6 +10,7 @@ import {
 } from "@/lib/patrols.functions";
 import { getMapboxToken } from "@/lib/config.functions";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { orgRoom, publishRealtimeEvent } from "@/lib/realtime.events";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import {
@@ -386,7 +387,7 @@ function PatrolDetail() {
           </div>
         )}
       </section>
-      <CiMutContext fn={ciFn} sos={sosFn} qc={qc} id={id} setMuts={(c: any, s: any) => { ciMut = c; sosMut = s; }} />
+      <CiMutContext orgId={appAccess.orgId} fn={ciFn} sos={sosFn} qc={qc} id={id} setMuts={(c: any, s: any) => { ciMut = c; sosMut = s; }} />
       <style>{`.inp{width:100%;border-radius:.375rem;border:1px solid var(--border);background:var(--surface);padding:.4rem .55rem;font-size:.8125rem;color:var(--foreground)}.inp:focus{outline:none;box-shadow:0 0 0 1px var(--ring)}`}</style>
     </div>
   );
@@ -417,9 +418,32 @@ function Metric({ label, value, tone = "muted" }: { label: string; value: string
 let ciMut: any = { mutate: () => {}, isPending: false };
 let sosMut: any = { mutate: () => {}, isPending: false };
 
-function CiMutContext({ fn, sos, qc, id, setMuts }: any) {
-  const a = useMutation({ mutationFn: (v: any) => fn({ data: v }), onSuccess: () => qc.invalidateQueries({ queryKey: ["checkins", id] }) });
-  const b = useMutation({ mutationFn: (v: any) => sos({ data: v }) });
+function CiMutContext({ orgId, fn, sos, qc, id, setMuts }: any) {
+  const a = useMutation({
+    mutationFn: (v: any) => fn({ data: v }),
+    onSuccess: (row: any, variables: any) => {
+      publishRealtimeEvent(orgRoom(orgId), "patrol:checkin", {
+        patrol_id: id,
+        shift_id: variables.shift_id,
+        waypoint_id: variables.waypoint_id,
+        method: variables.method,
+        checkin_id: row?.id ?? null,
+      });
+      qc.invalidateQueries({ queryKey: ["checkins", id] });
+    },
+  });
+  const b = useMutation({
+    mutationFn: (v: any) => sos({ data: v }),
+    onSuccess: (row: any) => {
+      publishRealtimeEvent(orgRoom(orgId), "incident:created", {
+        patrol_id: id,
+        incident_id: row?.incident?.id ?? row?.id ?? null,
+        severity: 5,
+        source: "patrol-sos",
+      });
+      qc.invalidateQueries({ queryKey: ["checkins", id] });
+    },
+  });
   useEffect(() => { setMuts(a, b); }, [a, b]);
   return null;
 }

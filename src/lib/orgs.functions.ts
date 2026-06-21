@@ -229,7 +229,7 @@ export const getSettings = createServerFn({ method: "GET" })
     const isAdmin = adminMem?.role === "manager" || adminMem?.role === "client_admin" || adminMem?.role === "lemtik_admin";
     const cols = isAdmin
       ? "*"
-      : "organisation_id, alert_escalation_contacts, default_incident_categories, report_delivery_schedule, whatsapp_alert_numbers, webhook_url, updated_at";
+      : "organisation_id, alert_escalation_contacts, default_incident_categories, report_delivery_schedule, whatsapp_alert_numbers, webhook_url, threshold_config, smart_devices, integration_config, updated_at";
     const { data, error } = await (context.supabase as any)
       .from("organisation_settings").select(cols).eq("organisation_id", orgId).maybeSingle();
     if (error) throwSafeError("orgs.settings.get", error, "Unable to load settings.");
@@ -241,6 +241,9 @@ export const getSettings = createServerFn({ method: "GET" })
       whatsapp_alert_numbers?: string[];
       webhook_url?: string | null;
       webhook_secret?: string | null;
+      threshold_config?: Record<string, unknown>;
+      smart_devices?: Array<Record<string, unknown>>;
+      integration_config?: Record<string, unknown>;
       updated_at?: string;
     } | null;
   });
@@ -262,13 +265,17 @@ export const updateSettings = createServerFn({ method: "POST" })
       whatsapp_alert_numbers: z.array(z.string().max(40)).max(20).optional(),
       webhook_url: z.string().url().max(500).nullable().optional(),
       webhook_secret: z.string().max(200).nullable().optional(),
+      threshold_config: z.record(z.string(), z.any()).optional(),
+      smart_devices: z.array(z.record(z.string(), z.any())).optional(),
+      integration_config: z.record(z.string(), z.any()).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const orgId = await getActiveOrgId(context.supabase, context.userId);
-    const { error } = await context.supabase
+    const payload: any = { organisation_id: orgId, ...data };
+    const { error } = await (context.supabase as any)
       .from("organisation_settings")
-      .upsert({ organisation_id: orgId, ...data }, { onConflict: "organisation_id" });
+      .upsert(payload, { onConflict: "organisation_id" });
     if (error) throwSafeError("orgs.settings.update", error, "Access denied or unable to update settings.");
     return { ok: true };
   });
@@ -287,10 +294,20 @@ export const listMembers = createServerFn({ method: "GET" })
 
     const ids = members.map((m) => m.user_id);
     if (ids.length === 0) return [];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles } = await context.supabase
       .from("profiles").select("user_id, display_name, zone, status, assigned_location_ids, updated_at").in("user_id", ids);
     const pMap = new Map(profiles?.map((p) => [p.user_id, p]) ?? []);
-    return members.map((m) => ({ ...m, profile: pMap.get(m.user_id) ?? null }));
+    const authPairs = await Promise.all(ids.map(async (userId) => {
+      try {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+        return [userId, data?.user?.email ?? null] as const;
+      } catch {
+        return [userId, null] as const;
+      }
+    }));
+    const emailMap = new Map(authPairs);
+    return members.map((m) => ({ ...m, email: emailMap.get(m.user_id) ?? null, profile: pMap.get(m.user_id) ?? null }));
   });
 
 export const updateMemberRole = createServerFn({ method: "POST" })

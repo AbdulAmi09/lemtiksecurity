@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMemberDetail, getMemberActivity } from "@/lib/users.functions";
+import { listLocations } from "@/lib/orgs.functions";
 import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import { ArrowLeft, ShieldCheck, MapPin, Loader2, Activity, ClipboardList, Radar, FileText, Sparkles, Clock3, ShieldAlert } from "lucide-react";
 
@@ -35,6 +35,7 @@ function MemberPage() {
   const { id } = Route.useParams();
   const detail = useServerFn(getMemberDetail);
   const activity = useServerFn(getMemberActivity);
+  const locList = useServerFn(listLocations);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["member", id], queryFn: () => detail({ data: { user_id: id } }),
@@ -42,14 +43,11 @@ function MemberPage() {
   const { data: act } = useQuery({
     queryKey: ["member-activity", id], queryFn: () => activity({ data: { user_id: id } }),
   });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["member-locations", id], queryFn: () => locList(),
+  });
 
-  if (isLoading) return <div className="p-10 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline" /> Loading…</div>;
-  if (error) return <div className="rounded-md border border-critical/40 bg-critical/10 px-3 py-2 text-xs text-critical">{(error as Error).message}</div>;
-
-  const p = data?.profile;
-  const name = p?.display_name || "Operator";
-  const initials = name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
-  const profileStats = useMemo(() => {
+  const profileStats = (() => {
     const incidents = act?.incidents ?? [];
     const checkins = act?.checkins ?? [];
     const audit = act?.audit ?? [];
@@ -62,7 +60,17 @@ function MemberPage() {
     const lateCheckins = checkins.filter((c: any) => c.status !== "on_time").length;
     const activityScore = Math.min(100, 40 + incidents.length * 5 + checkins.length * 3 + notes.length * 4 - lateCheckins * 4);
     return { incidents, checkins, audit, notes, recent24, highSeverity, lateCheckins, activityScore };
-  }, [act]);
+  })();
+
+  if (isLoading) return <div className="p-10 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline" /> Loading…</div>;
+  if (error) return <div className="rounded-md border border-critical/40 bg-critical/10 px-3 py-2 text-xs text-critical">{(error as Error).message}</div>;
+
+  const p = data?.profile;
+  const name = p?.display_name || "Operator";
+  const initials = name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
+  const assignedLocations = (p?.assigned_location_ids ?? [])
+    .map((locationId) => locations.find((location: any) => location.id === locationId))
+    .filter(Boolean);
 
   return (
     <div className="space-y-5">
@@ -138,6 +146,7 @@ function MemberPage() {
           </div>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> {roleLabel(data?.membership?.role ?? "officer")}</span>
+            {data?.email && <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" /> {data.email}</span>}
             {p?.zone && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {p.zone}</span>}
             <span>Last seen {timeAgo(p?.last_seen_at)}</span>
           </div>
@@ -145,8 +154,21 @@ function MemberPage() {
             <Field label="Phone" value={p?.phone || "—"} />
             <Field label="Employee ID" value={p?.employee_id || "—"} />
             <Field label="Joined" value={data?.membership?.created_at ? new Date(data.membership.created_at).toLocaleDateString("en-GB") : "—"} />
-            <Field label="Locations" value={String(p?.assigned_location_ids?.length ?? 0)} />
+            <Field label="Locations" value={String(assignedLocations.length)} />
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-5">
+        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Assigned locations</div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          {assignedLocations.length === 0 ? (
+            <span className="text-muted-foreground">No assigned locations.</span>
+          ) : assignedLocations.map((location: any) => (
+            <span key={location.id} className="rounded-md border border-border bg-surface px-2.5 py-1">
+              {location.name}
+            </span>
+          ))}
         </div>
       </div>
 

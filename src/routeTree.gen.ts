@@ -27,6 +27,7 @@ import { Route as OfficerHomeRouteImport } from './routes/officer.home'
 import { Route as OfficerDispatchRouteImport } from './routes/officer.dispatch'
 import { Route as AppUsersRouteImport } from './routes/app.users'
 import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppReportCentreRouteImport } from './routes/app.report-centre'
 import { Route as AppPatrolsRouteImport } from './routes/app.patrols'
 import { Route as AppOrgRouteImport } from './routes/app.org'
 import { Route as AppMapRouteImport } from './routes/app.map'
@@ -135,6 +136,11 @@ const AppUsersRoute = AppUsersRouteImport.update({
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportCentreRoute = AppReportCentreRouteImport.update({
+  id: '/report-centre',
+  path: '/report-centre',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPatrolsRoute = AppPatrolsRouteImport.update({
@@ -250,6 +256,7 @@ export interface FileRoutesByFullPath {
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
   '/app/patrols': typeof AppPatrolsRouteWithChildren
+  '/app/report-centre': typeof AppReportCentreRoute
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
   '/officer/dispatch': typeof OfficerDispatchRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
   '/app/patrols': typeof AppPatrolsRouteWithChildren
+  '/app/report-centre': typeof AppReportCentreRoute
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
   '/officer/dispatch': typeof OfficerDispatchRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/app/map': typeof AppMapRoute
   '/app/org': typeof AppOrgRoute
   '/app/patrols': typeof AppPatrolsRouteWithChildren
+  '/app/report-centre': typeof AppReportCentreRoute
   '/app/reports': typeof AppReportsRoute
   '/app/users': typeof AppUsersRouteWithChildren
   '/officer/dispatch': typeof OfficerDispatchRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/app/map'
     | '/app/org'
     | '/app/patrols'
+    | '/app/report-centre'
     | '/app/reports'
     | '/app/users'
     | '/officer/dispatch'
@@ -405,6 +415,7 @@ export interface FileRouteTypes {
     | '/app/map'
     | '/app/org'
     | '/app/patrols'
+    | '/app/report-centre'
     | '/app/reports'
     | '/app/users'
     | '/officer/dispatch'
@@ -444,6 +455,7 @@ export interface FileRouteTypes {
     | '/app/map'
     | '/app/org'
     | '/app/patrols'
+    | '/app/report-centre'
     | '/app/reports'
     | '/app/users'
     | '/officer/dispatch'
@@ -603,6 +615,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/app/reports'
       preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/report-centre': {
+      id: '/app/report-centre'
+      path: '/report-centre'
+      fullPath: '/app/report-centre'
+      preLoaderRoute: typeof AppReportCentreRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/patrols': {
@@ -800,6 +819,7 @@ interface AppRouteChildren {
   AppMapRoute: typeof AppMapRoute
   AppOrgRoute: typeof AppOrgRoute
   AppPatrolsRoute: typeof AppPatrolsRouteWithChildren
+  AppReportCentreRoute: typeof AppReportCentreRoute
   AppReportsRoute: typeof AppReportsRoute
   AppUsersRoute: typeof AppUsersRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
@@ -819,6 +839,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMapRoute: AppMapRoute,
   AppOrgRoute: AppOrgRoute,
   AppPatrolsRoute: AppPatrolsRouteWithChildren,
+  AppReportCentreRoute: AppReportCentreRoute,
   AppReportsRoute: AppReportsRoute,
   AppUsersRoute: AppUsersRouteWithChildren,
   AppIndexRoute: AppIndexRoute,

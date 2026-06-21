@@ -9,6 +9,7 @@ import { getActiveOrg, listLocations, listMembers } from "@/lib/orgs.functions";
 import { severityMeta, statusMeta, typeMeta, type Severity, type IncidentType, type IncidentStatus } from "@/lib/mockData";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { orgRoom, publishRealtimeEvent } from "@/lib/realtime.events";
 import { IncidentWizardForm } from "@/components/IncidentWizardForm";
 import { type IncidentSubmitPayload } from "@/components/IncidentReportForm";
 import * as offline from "@/lib/offlineQueue";
@@ -206,8 +207,18 @@ function Incidents() {
       }
       return create({ data });
     },
-    onSuccess: (row: any) => {
+    onSuccess: (row: any, variables) => {
       queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      if (row?.id) {
+        publishRealtimeEvent(orgRoom(appAccess.orgId), "incident:created", {
+          incident_id: row.id,
+          code: row.code ?? null,
+          severity: row.severity ?? variables.severity ?? null,
+          location: row.location ?? variables.location ?? null,
+          zone: row.zone ?? variables.zone ?? null,
+          created_by: me,
+        });
+      }
       setShowNew(false);
       if (row?.id) {
         sessionStorage.setItem(AUTO_OPEN_TAB_KEY, row.id);

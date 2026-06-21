@@ -28,6 +28,7 @@ import {
 } from "@/lib/mockData";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { useRealtimeInvalidate } from "@/lib/useRealtime";
+import { orgRoom, officerRoom, publishRealtimeEvent } from "@/lib/realtime.events";
 import { resolveAppAccess, requireSectionAccess } from "@/lib/rbac";
 import {
   ArrowLeft,
@@ -508,6 +509,22 @@ function IncidentDetailPage() {
         severity: Math.max(Number(inc.severity) || 1, 3),
       },
     });
+    publishRealtimeEvent(officerRoom(officer.id), action === "dispatch_ping" ? "officer:ping" : "officer:dispatch", {
+      incident_id: id,
+      incident_code: inc.code,
+      action,
+      message,
+      officer_id: officer.id,
+      officer_name: officer.name,
+      severity: inc.severity,
+    });
+    publishRealtimeEvent(orgRoom(appAccess.orgId), action === "dispatch_ping" ? "officer:pinged" : "incident:updated", {
+      incident_id: id,
+      officer_id: officer.id,
+      officer_name: officer.name,
+      action,
+      severity: inc.severity,
+    });
     await invalidate();
   };
 
@@ -673,11 +690,26 @@ function IncidentDetailPage() {
                     <AssignControl
                       current={inc.officer}
                       members={members}
-                      onAssign={(uid) => reassign({ data: { id, member_user_id: uid } }).then(invalidate)}
+                      onAssign={(uid) => reassign({ data: { id, member_user_id: uid } }).then(() => {
+                        publishRealtimeEvent(orgRoom(appAccess.orgId), "incident:assigned", {
+                          incident_id: id,
+                          incident_code: inc.code,
+                          member_user_id: uid,
+                        });
+                        invalidate();
+                      })}
                     />
                     <StatusControl
                       current={inc.status}
-                      onChange={(status, note) => transition({ data: { id, status, note } }).then(invalidate)}
+                      onChange={(status, note) => transition({ data: { id, status, note } }).then(() => {
+                        publishRealtimeEvent(orgRoom(appAccess.orgId), "incident:updated", {
+                          incident_id: id,
+                          incident_code: inc.code,
+                          status,
+                          note,
+                        });
+                        invalidate();
+                      })}
                     />
                   </div>
                   <div className="mt-4 grid gap-2 text-xs md:grid-cols-2">
@@ -801,7 +833,14 @@ function IncidentDetailPage() {
                             <MapPinned className="h-3.5 w-3.5" /> Send route
                           </button>
                           <button
-                            onClick={() => reassign({ data: { id, member_user_id: officer.id } }).then(invalidate)}
+                            onClick={() => reassign({ data: { id, member_user_id: officer.id } }).then(() => {
+                              publishRealtimeEvent(orgRoom(appAccess.orgId), "incident:assigned", {
+                                incident_id: id,
+                                incident_code: inc.code,
+                                member_user_id: officer.id,
+                              });
+                              invalidate();
+                            })}
                             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] uppercase tracking-wider text-primary-foreground hover:opacity-95"
                           >
                             <Users className="h-3.5 w-3.5" /> Assign

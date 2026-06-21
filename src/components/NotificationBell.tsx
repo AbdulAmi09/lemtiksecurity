@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Bell, Loader2, Check } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Bell, Loader2, Check, ChevronRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -33,6 +33,7 @@ export function NotificationBell() {
   });
 
   const unread = notifs.filter((n) => !n.read).length;
+  const preview = useMemo(() => notifs.slice(0, 5), [notifs]);
 
   const readMut = useMutation({
     mutationFn: (id: string) => markRead({ data: { alert_id: id } }),
@@ -83,11 +84,11 @@ export function NotificationBell() {
               <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" /> Loading…
               </div>
-            ) : notifs.length === 0 ? (
+            ) : preview.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground">No notifications yet.</div>
             ) : (
               <ul className="divide-y divide-border">
-                {notifs.map((n) => (
+                {preview.map((n) => (
                   <li key={n.id} className={`px-4 py-3 ${n.read ? "" : "bg-primary/5"}`}>
                     <div className="flex items-start gap-2">
                       <div className="flex-1 min-w-0">
@@ -127,9 +128,9 @@ export function NotificationBell() {
           <Link
             to="/app/alerts"
             onClick={() => setOpen(false)}
-            className="block text-center text-[11px] py-2 border-t border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
+            className="flex items-center justify-center gap-1 text-center text-[11px] py-2 border-t border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
           >
-            View all alerts & settings →
+            View all <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
       )}

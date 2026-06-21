@@ -1080,7 +1080,7 @@ Invite User
   Enter email or phone
   Select role (limited to roles below your own)
   Select assigned location(s)
-  Send invitation via Resend email or Termii SMS
+  Send invitation via Resend email
   Invitation expires after 48 hours
 
 User Profile

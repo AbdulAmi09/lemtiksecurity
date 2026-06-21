@@ -337,6 +337,10 @@ function OfficerNavigation() {
 
   const distanceKm = plan ? haversineKm(plan.start, plan.destination) : null;
 
+  const logArrival = () => {
+    setArrived(true);
+  };
+
   if (arrived) {
     return (
       <div className="space-y-4">
@@ -458,7 +462,7 @@ function OfficerNavigation() {
             )}
             <button
               type="button"
-              onClick={() => setArrived(true)}
+              onClick={logArrival}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950"
             >
               <Navigation2 className="h-4 w-4" />

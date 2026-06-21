@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildWelcomeEmail, sendResendEmail } from "@/lib/email.service";
 import { throwSafeError } from "@/lib/server-errors";
 
 const orgType = z.enum(["estate", "corporate", "hotel", "government"]);
@@ -27,6 +28,31 @@ async function assertPlatformAdmin(supabase: any, userId: string) {
 
 function formatMoney(amount: number) {
   return `₦${amount.toLocaleString("en-NG")}`;
+}
+
+async function sendWelcomeEmail(input: {
+  email: string;
+  organisationName: string;
+  adminName?: string | null;
+  inviteUrl: string;
+}) {
+  const email = buildWelcomeEmail({
+    organisationName: input.organisationName,
+    adminName: input.adminName ?? null,
+    inviteUrl: input.inviteUrl,
+  });
+  const delivery = await sendResendEmail({
+    to: input.email,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+  });
+
+  if (!delivery.ok) {
+    return delivery.skipped ? null : delivery.error ?? "Unable to deliver welcome email.";
+  }
+
+  return null;
 }
 
 export const listPlatformOrganisations = createServerFn({ method: "GET" })
@@ -254,6 +280,12 @@ export const createPlatformOrganisation = createServerFn({ method: "POST" })
       },
       ...(redirectTo ? { redirectTo } : {}),
     });
+    const deliveryWarning = await sendWelcomeEmail({
+      email: invite.email,
+      organisationName: org.name,
+      adminName: data.admin_name ?? me?.display_name ?? null,
+      inviteUrl: redirectTo ?? invite.token,
+    });
 
     await context.supabase.from("audit_log").insert({
       organisation_id: org.id,
@@ -264,7 +296,7 @@ export const createPlatformOrganisation = createServerFn({ method: "POST" })
       details: { name: org.name, tier: org.subscription_tier },
     });
 
-    return { ok: true, org, location, invite, delivery_warning: emailErr?.message ?? null };
+    return { ok: true, org, location, invite, delivery_warning: emailErr?.message ?? deliveryWarning };
   });
 
 export const updatePlatformOrganisation = createServerFn({ method: "POST" })

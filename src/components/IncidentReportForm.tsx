@@ -217,9 +217,14 @@ export function IncidentReportForm({
       <div className="min-h-full flex items-start justify-center p-4 sm:p-6">
         <div className="w-full max-w-2xl rounded-lg border border-border bg-card shadow-2xl my-4">
           <div className="flex items-start justify-between p-5 border-b border-border sticky top-0 bg-card z-10 rounded-t-lg">
-            <div>
+          <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Log incident</div>
               <h2 className="mt-1 text-lg font-semibold">{mode === "quick" ? "Quick report" : "Full report"}</h2>
+              {mode === "quick" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Quick report mode is designed to take under 30 seconds for a first pass incident log.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex rounded-md border border-border bg-surface p-0.5">
@@ -298,7 +303,7 @@ export function IncidentReportForm({
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Location</div>
                 <button type="button" onClick={captureGps} disabled={gpsLoading} className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
                   {gpsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3 w-3" />}
-                  Detect GPS
+                  Use my location
                 </button>
               </div>
               {form.coord_y !== undefined && (
@@ -376,15 +381,15 @@ export function IncidentReportForm({
             <fieldset className="rounded-md border border-border bg-surface p-3 space-y-2">
               <legend className="text-[11px] uppercase tracking-wider text-muted-foreground px-1">Evidence</legend>
               <div className="flex flex-wrap gap-2">
-                <EvBtn icon={Camera} label={`Photo (${counts.image}/${LIMITS.image})`} onClick={() => photoIn.current?.click()} loading={uploadingKind === "image"} />
-                <EvBtn icon={Video} label={`Video (${counts.video}/${LIMITS.video})`} onClick={() => videoIn.current?.click()} loading={uploadingKind === "video"} />
-                <EvBtn icon={FileText} label={`Doc (${counts.document}/${LIMITS.document})`} onClick={() => docIn.current?.click()} loading={uploadingKind === "document"} />
+                <EvBtn icon={Camera} label={`Add photo (${counts.image}/${LIMITS.image})`} onClick={() => photoIn.current?.click()} loading={uploadingKind === "image"} />
+                <EvBtn icon={Video} label={`Add video (${counts.video}/${LIMITS.video})`} onClick={() => videoIn.current?.click()} loading={uploadingKind === "video"} />
+                <EvBtn icon={FileText} label={`Add doc (${counts.document}/${LIMITS.document})`} onClick={() => docIn.current?.click()} loading={uploadingKind === "document"} />
                 {recording ? (
                   <button type="button" onClick={stopRecording} className="inline-flex items-center gap-1.5 rounded-md bg-critical/15 border border-critical/40 text-critical px-3 py-1.5 text-xs">
                     <Square className="h-3 w-3" /> Stop ({recSeconds}s)
                   </button>
                 ) : (
-                  <EvBtn icon={Mic} label={`Voice (${counts.audio}/${LIMITS.audio})`} onClick={startRecording} loading={uploadingKind === "audio"} />
+                  <EvBtn icon={Mic} label={`Voice note (${counts.audio}/${LIMITS.audio})`} onClick={startRecording} loading={uploadingKind === "audio"} />
                 )}
               </div>
 
