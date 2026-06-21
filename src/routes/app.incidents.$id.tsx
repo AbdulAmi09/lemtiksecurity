@@ -187,6 +187,7 @@ function hashToOffset(seed: string) {
 
 function IncidentDetailPage() {
   const { id } = Route.useParams();
+  const { appAccess } = Route.useRouteContext();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<IncidentTab>("overview");

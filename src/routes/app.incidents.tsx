@@ -42,15 +42,25 @@ export const Route = createFileRoute("/app/incidents")({
     ]);
     return { appAccess };
   },
-  component: Incidents,
+  component: IncidentsPage,
 });
 
 type SortKey = "id" | "severity" | "reported_at" | "time_open" | "status" | "type" | "location" | "officer";
 
-function Incidents() {
+function IncidentsPage() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { appAccess } = Route.useRouteContext();
+  const isDetailRoute = pathname.startsWith("/app/incidents/") && pathname !== "/app/incidents";
+
+  if (isDetailRoute) {
+    return <Outlet />;
+  }
+
+  return <IncidentsList appAccess={appAccess} navigate={navigate} />;
+}
+
+function IncidentsList({ appAccess, navigate }: { appAccess: ReturnType<typeof Route.useRouteContext>["appAccess"]; navigate: ReturnType<typeof useNavigate>; }) {
   const queryClient = useQueryClient();
   const list = useServerFn(listIncidents);
   const create = useServerFn(createIncident);
@@ -93,11 +103,6 @@ function Incidents() {
   const [draft, setDraft] = useState<Partial<IncidentSubmitPayload> | null>(null);
   const [bulkOpen, setBulkOpen] = useState<"status" | "assign" | null>(null);
   const AUTO_OPEN_TAB_KEY = "lemtik-open-incident-tab";
-  const isDetailRoute = pathname.startsWith("/app/incidents/") && pathname !== "/app/incidents";
-
-  if (isDetailRoute) {
-    return <Outlet />;
-  }
 
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [pending, setPending] = useState<offline.QueuedIncident[]>([]);
