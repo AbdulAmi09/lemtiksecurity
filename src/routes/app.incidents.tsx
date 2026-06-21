@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Outlet, createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -49,6 +49,7 @@ type SortKey = "id" | "severity" | "reported_at" | "time_open" | "status" | "typ
 
 function Incidents() {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { appAccess } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const list = useServerFn(listIncidents);
@@ -92,6 +93,11 @@ function Incidents() {
   const [draft, setDraft] = useState<Partial<IncidentSubmitPayload> | null>(null);
   const [bulkOpen, setBulkOpen] = useState<"status" | "assign" | null>(null);
   const AUTO_OPEN_TAB_KEY = "lemtik-open-incident-tab";
+  const isDetailRoute = pathname.startsWith("/app/incidents/") && pathname !== "/app/incidents";
+
+  if (isDetailRoute) {
+    return <Outlet />;
+  }
 
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [pending, setPending] = useState<offline.QueuedIncident[]>([]);
