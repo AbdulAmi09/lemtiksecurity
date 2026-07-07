@@ -475,7 +475,7 @@ pnpm preview     # Preview production build locally
 <img src="https://img.shields.io/badge/👤-Founder%20%26%20CEO-00D4FF?style=for-the-badge&labelColor=080D1A" />
 <br/><br/>
 <strong>Amisu Abdulsemiu Omotoyosi</strong><br/>
-<em>Product vision · Platform architecture · Business development</em><br/>
+<em>Founder & CTO . Product vision · Platform architecture · Business development</em><br/>
 <a href="https://linkedin.com/in/amisuabdul">
 <img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=flat-square&logo=linkedin&logoColor=white"/>
 </a>
